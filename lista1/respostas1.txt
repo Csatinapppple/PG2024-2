@@ -1,0 +1,6 @@
+1.
+	glsl é uma linguagem de programação do proprio OpenGL que cria codigo de maquina para se
+	comunicar com a GPU do computador
+
+2.
+	
