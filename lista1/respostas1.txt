@@ -3,4 +3,8 @@
 	comunicar com a GPU do computador
 
 2.
-	
+  são poligonos, se armazena vertices no VBO.
+
+3.
+
+
