@@ -47,7 +47,7 @@ const GLchar* fragmentShaderSource = "#version 400 core\n"
 "{\n"
 "color = inputColor;\n"
 "}\n\0";
-#define N 200
+#define N 500
 
 // Função MAIN
 int main()
@@ -129,7 +129,7 @@ int main()
 		// Poligono Preenchido - GL_TRIANGLES
 		// Poligono contorno - GL_LINE_LOOP
 		// Poligono vértices - GL_POINTS
-		//glDrawArrays(GL_LINES, 0, N);
+		glDrawArrays(GL_LINE_STRIP, 0, N-1);
 		glDrawArrays(GL_POINTS, 0, N);
 
 		glBindVertexArray(0); //Desconectando o buffer de geometria
@@ -214,7 +214,7 @@ GLfloat* generateVertices(int n){
 		ret[i*3]=(GLfloat)(cos(angle) * rad);
 		ret[(i*3)+1]=(GLfloat)(sin(angle) * rad);
 		ret[(i*3)+2]=0.0;
-		rad+=0.01f;
+		rad+=0.01f/2;
 		angle+=slice;
 		printf("vertice[%d] = x: %lf, y: %lf, z: %lf \n", i, ret[i*3], ret[(i*3)+1], ret[(i*3)+2]);
 	}
