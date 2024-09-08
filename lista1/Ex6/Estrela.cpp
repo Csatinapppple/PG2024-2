@@ -130,7 +130,8 @@ int main()
 		// Poligono Preenchido - GL_TRIANGLES
 		// Poligono contorno - GL_LINE_LOOP
 		// Poligono vértices - GL_POINTS
-		glDrawArrays(GL_POINTS, 0, verts);
+		//glDrawArrays(GL_POINTS, 0, verts);
+		glDrawArrays(GL_TRIANGLES, 0, verts);
 
 		glBindVertexArray(0); //Desconectando o buffer de geometria
 
@@ -216,10 +217,14 @@ int setupGeometry()
 		//x   y     z
 		//T0
 		0, 0.75, 0,
-		0.5,0.5, 0,
-		-0.5, 0.5, 0,
-		-.25, -.25, 0,
 		0.25, -0.25, 0,
+		0,0,0,
+		0, 0.75, 0,
+		-.25, -.25, 0,
+		0,0,0,
+		-0.5, 0.5, 0,
+		0.5,0.5, 0,
+		0,0,0
 	};
 
 	verts = sizeof(vertices)/sizeof(vertices[0]);
