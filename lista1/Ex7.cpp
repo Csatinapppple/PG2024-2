@@ -242,7 +242,7 @@ int setupGeometry()
 	// Faz a conexão (vincula) do buffer como um buffer de array
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	// Envia os dados do array de floats para o buffer da OpenGl
-	glBufferData(GL_ARRAY_BUFFER, N * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, N * sizeof(GLfloat) * 3, vertices, GL_STATIC_DRAW);
 
 	// Geração do identificador do VAO (Vertex Array Object)
 	glGenVertexArrays(1, &VAO);
