@@ -215,7 +215,6 @@ GLfloat* generateCircle(){
 		ret[i*3]= radius * (GLfloat)cos(angle);
 		ret[i*3+1]= radius * (GLfloat)sin(angle);
 		ret[i*3+2] = 0.0f;		
-				printf("vertice[%d] = x: %lf, y: %lf, z: %lf \n", i, ret[i * 3], ret[(i * 3) + 1], ret[(i * 3) + 2]);
 		angle+= slice;
 	}
 

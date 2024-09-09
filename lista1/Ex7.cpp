@@ -207,7 +207,7 @@ GLfloat *generateVertices(int n)
 
 	GLfloat rad = 0.0,
 					angle = 0.0,
-					slice = (2 * M_PI / (n / 8));
+					slice = (2 * M_PI / n);
 
 	for (int i = 0; i < n; i++)
 	{
