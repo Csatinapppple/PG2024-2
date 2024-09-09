@@ -5,3 +5,4 @@ main:
 	g++ Pentagono.cpp ../glad.c -lglfw -ldl -o Pentagono.out
 	g++ Estrela.cpp ../glad.c -lglfw -ldl -o Estrela.out
 	g++ Pizza.cpp ../glad.c -lglfw -ldl -o Pizza.out
+	g++ Pacman.cpp ../glad.c -lglfw -ldl -o Pacman.out
