@@ -6,5 +6,8 @@
   são poligonos, se armazena vertices no VBO.
 
 3.
-
-
+  VBO é o buffer de vertices, seria um array de vertices carregados na memoria, 
+  VAO é o objeto de array, ou seja, ele carrega VBOs, então na relacao de um ao outro
+  poderia se dizer que um VAO pode ter n VBO's, possui as informacoes do tipo de vertice e seu
+  tamanho, o EBO, serve para dar um Array de indices para desenhar nossos arrays, para que não
+  tenha arrays iguais no nosso buffer salvando espaço sua função seria equivalente a um HashMap
