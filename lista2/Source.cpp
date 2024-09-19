@@ -75,7 +75,7 @@ int main()
 #endif
 
 	// Criação da janela GLFW
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Ola Triangulo! -- Rossana", nullptr, nullptr);
+	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Ola Triangulo! -- ", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Fazendo o registro da função de callback para a janela GLFW
@@ -117,31 +117,57 @@ int main()
 	// glViewport(0, 0, width, height);
 	//  Loop da aplicação - "game loop"
 	//  Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
-
-	while (glfwWindowShouldClose(window))
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
+	glClear(GL_COLOR_BUFFER_BIT);
+	glBindVertexArray(VAO); // Conectando ao buffer de geometria
+	glUniform4f(colorLoc, 1.0f, 0.0f, 1.0f, 1.0f); // enviando cor para variável uniform inputColor
+	while (!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
 
-		// Limpa o buffer de cor
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT);
+	  glViewport(0, 0, width/2, height/2);
+		
 
-		glLineWidth(10);
-		glPointSize(20);
-
-		glBindVertexArray(VAO); // Conectando ao buffer de geometria
-
-		glUniform4f(colorLoc, 1.0f, 0.0f, 1.0f, 1.0f); // enviando cor para variável uniform inputColor
 
 		// Chamada de desenho - drawcall
 		// Poligono Preenchido - GL_TRIANGLES
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		glBindVertexArray(0); // Desconectando o buffer de geometria
+		// Troca os buffers da tela
+		
+	  glViewport(width/2, 0, width/2, height/2);
+		
+
+
+		// Chamada de desenho - drawcall
+		// Poligono Preenchido - GL_TRIANGLES
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		// Troca os buffers da tela
+		//glfwSwapBuffers(window);
+
+	  glViewport(width/2, height/2, width/2, height/2);
+		
+		glBindVertexArray(VAO); // Conectando ao buffer de geometria
+
+		// Chamada de desenho - drawcall
+		// Poligono Preenchido - GL_TRIANGLES
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		// Troca os buffers da tela
+		//glfwSwapBuffers(window);
+	  
+		glViewport(0, height/2, width/2, height/2);
+		
+		glBindVertexArray(VAO); // Conectando ao buffer de geometria
+
+		// Chamada de desenho - drawcall
+		// Poligono Preenchido - GL_TRIANGLES
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
 		glfwSwapBuffers(window);
 	}
+
 	// Pede pra OpenGL desalocar os buffers
 	glDeleteVertexArrays(1, &VAO);
 	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
