@@ -4,7 +4,8 @@
 // GLFW
 #include <GLFW/glfw3.h>
 
-#include "../include/file_tools.hpp"
+#include "../include/shader.hpp"
+#include "../include/tools.hpp"
 
 GLfloat vertices[] = {
 	-0.5, 0.5, 0,
@@ -13,16 +14,13 @@ GLfloat vertices[] = {
 };
 
 GLuint vertexShader;
-std::string vertexShaderSource = readFile("./src/shaders/vertexShader.glsl");
+std::string vertexShaderPath=getFileContent("./src/shaders/vertexShader.glsl");
+
 
 int main() {
+	using namespace std;
 
-	GLuint VBO;
-	glGenBuffers(1, &VBO);
-	std::cout << vertexShaderSource;
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	cout << vertexShaderPath << endl;
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-
+	return 0;
 }
