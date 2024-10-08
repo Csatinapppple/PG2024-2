@@ -13,14 +13,15 @@ GLfloat vertices[] = {
 	0.5, 0.5, 0
 };
 
-GLuint vertexShader;
-std::string vertexShaderPath=getFileContent("./src/shaders/vertexShader.glsl");
+GLFWwindow* window;
+GLuint vertexShader,fragmentShader;
+std::string vertexShaderSrc=getFileContent("./src/shaders/vertexShader.glsl"),
+						fragmentShaderSrc=getFileContent("./src/shaders/fragmentShader.glsl");
 
 
 int main() {
-	using namespace std;
 
-	cout << vertexShaderPath << endl;
+	
 
 	return 0;
 }
