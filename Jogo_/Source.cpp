@@ -107,7 +107,7 @@ int main()
 	// #endif
 
 	// Criação da janela GLFW
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Hello Sprites!", nullptr, nullptr);
+	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo -GA", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Fazendo o registro da função de callback para a janela GLFW
@@ -189,6 +189,10 @@ int main()
 			character.position.x -= vel;
 		if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D])
 			character.position.x += vel;
+		if (keys[GLFW_KEY_UP] || keys[GLFW_KEY_W])
+			character.position.x += vel;
+		if (keys[GLFW_KEY_DOWN] || keys[GLFW_KEY_S])
+			character.position.x -= vel;
 		// Incremento circular (em loop) do índice do frame
 
 		float now = glfwGetTime();
