@@ -1,4 +1,4 @@
 cc=g++
-cflags=-lglfw -ldl -lm --std=c++11
+cflags=-lglfw -ldl -lm --std=c++20
 main:
 	$(cc) src/*.c* $(cflags)
