@@ -44,11 +44,12 @@ struct Sprite
 
 // Variáveis globais para controle
 const GLuint WIDTH = 800, HEIGHT = 600;
-Sprite tankA, tankB; // Tanques
+Sprite tankA, tankB, weaponA, weaponB; // Tanques e armas
 vector<Sprite> bulletsA, bulletsB; // Munição de ambos os tanques
 float tankSpeed = 300.0f;
 float bulletSpeed = 500.0f;
 float tankWidth = 0.2f, tankHeight = 0.2f;
+bool explosion = false; // Controle de explosão
 
 // Código fonte do Vertex Shader (em GLSL): ainda hardcoded
 const GLchar *vertexShaderSource = "#version 400\n"
@@ -81,11 +82,11 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 int setupShader();
 int loadTexture(string filePath, int &imgWidth, int &imgHeight);
 void drawSprite(Sprite spr, GLuint shaderID);
-void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime);
+void updateTank(Sprite &tank, Sprite &weapon, GLFWwindow *window, float deltaTime, bool isPlayer);
 void shootBullet(Sprite &tank, vector<Sprite> &bullets);
 void updateBullets(vector<Sprite> &bullets, float deltaTime);
 bool checkCollision(Sprite &tank, Sprite &bullet);
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void triggerExplosion(Sprite &tank);
 
 // Inicializa o tanque
 void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
@@ -110,15 +111,19 @@ int main()
     glfwSetKeyCallback(window, key_callback);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    // Configuração inicial dos tanques
-	tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
-	tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    // Configuração inicial dos tanques e armas
+    tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
 
-	// Carregamento das texturas dos tanques
-	int imgWidth, imgHeight;
-	tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
-	tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
+    weaponA.setupSprite(2, vec3(-0.5f, -0.75f, 0.0f), vec3(tankWidth / 2.0f, tankHeight / 2.0f, 1.0f));
+    weaponB.setupSprite(3, vec3(0.5f, 0.75f, 0.0f), vec3(tankWidth / 2.0f, tankHeight / 2.0f, 1.0f));
 
+    // Carregar texturas dos tanques e armas
+    int imgWidth, imgHeight;
+    tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/Hulls_Color_A.png", imgWidth, imgHeight);
+    tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/Hulls_Color_B.png", imgWidth, imgHeight);
+    weaponA.texID = loadTexture("../Texturas/battle-tank-game-assets/Weapon_Color_A.png", imgWidth, imgHeight);
+    weaponB.texID = loadTexture("../Texturas/battle-tank-game-assets/Weapon_Color_B.png", imgWidth, imgHeight);
 
     // Carregamento dos shaders
     GLuint shaderProgram = setupShader();
@@ -132,32 +137,33 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Definir cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT);          // Limpar a tela com a cor definida
-
-        // Atualiza os tanques
-        updateTank(tankA, window, deltaTime);
-        updateTank(tankB, window, deltaTime);
+        // Atualiza os tanques e armas
+        updateTank(tankA, weaponA, window, deltaTime, true);   // Tanque controlado pelo jogador
+        updateTank(tankB, weaponB, window, deltaTime, false);  // Tanque controlado pela máquina
 
         // Atualiza as balas
         updateBullets(bulletsA, deltaTime);
         updateBullets(bulletsB, deltaTime);
 
-        // Verifica colisões
+        // Verifica colisões e aplica explosão
         for (auto &bullet : bulletsA) {
             if (checkCollision(tankB, bullet)) {
                 tankB.isAlive = false;
+                triggerExplosion(tankB); // Ativar explosão
             }
         }
         for (auto &bullet : bulletsB) {
             if (checkCollision(tankA, bullet)) {
                 tankA.isAlive = false;
+                triggerExplosion(tankA); // Ativar explosão
             }
         }
 
         // Renderização dos sprites
         drawSprite(tankA, shaderProgram);
+        drawSprite(weaponA, shaderProgram);
         drawSprite(tankB, shaderProgram);
+        drawSprite(weaponB, shaderProgram);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
