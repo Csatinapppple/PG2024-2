@@ -190,9 +190,9 @@ int main()
 		if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D])
 			character.position.x += vel;
 		if (keys[GLFW_KEY_UP] || keys[GLFW_KEY_W])
-			character.position.x += vel;
+			character.position.y += vel;
 		if (keys[GLFW_KEY_DOWN] || keys[GLFW_KEY_S])
-			character.position.x -= vel;
+			character.position.y -= vel;
 		// Incremento circular (em loop) do índice do frame
 
 		float now = glfwGetTime();
