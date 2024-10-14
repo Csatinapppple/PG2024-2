@@ -115,7 +115,7 @@ int main()
 	tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
 	tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
 
-	// Carregamento das texturas dos tanques
+	// Carregamento das texturas dos tanque
 	int imgWidth, imgHeight;
 	tankA.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
 	tankB.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
