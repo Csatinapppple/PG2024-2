@@ -160,10 +160,10 @@ int main()
 
     // Carregar texturas dos tanques e armas
     int imgWidth, imgHeight;
-    tankA.texID = loadTexture("C:/Users/Bruno/OneDrive/Documentos/GitHub/PG2024-2/Texturas/tank/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
-    tankB.texID = loadTexture("C:/Users/Bruno/OneDrive/Documentos/GitHub/PG2024-2/Texturas/tank/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
-    weaponA.texID = loadTexture("C:/Users/Bruno/OneDrive/Documentos/GitHub/PG2024-2/Texturas/tank/PNG/Weapon_Color_A/Weapon_Color_A.png", imgWidth, imgHeight);
-    weaponB.texID = loadTexture("C:/Users/Bruno/OneDrive/Documentos/GitHub/PG2024-2/Texturas/tank/PNG/Weapon_Color_B/Weapon_Color_B.png", imgWidth, imgHeight);
+    tankA.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
+    tankB.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
+    weaponA.texID = loadTexture("../Texturas/tank/PNG/Weapon_Color_A/Weapon_Color_A.png", imgWidth, imgHeight);
+    weaponB.texID = loadTexture("../Texturas/tank/PNG/Weapon_Color_B/Weapon_Color_B.png", imgWidth, imgHeight);
 
 
     // Carregamento dos shaders
@@ -329,7 +329,7 @@ void triggerExplosion(Sprite &tank)
 {
     // Aqui será carregada a textura de explosão para o tanque atingido
     int imgWidth, imgHeight;
-    tank.texID = loadTexture("C:/Users/Bruno/OneDrive/Documentos/GitHub/PG2024-2/Texturas/tank/PNG/Effects/Explosion.png", imgWidth, imgHeight);
+    tank.texID = loadTexture("../Texturas/tank/PNG/Effects/Explosion.png", imgWidth, imgHeight);
 }
 
 // Função para desenhar um sprite
