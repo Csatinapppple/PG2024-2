@@ -173,7 +173,6 @@ int main()
     return 0;
 }
 
-// Função de callback de teclado
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
@@ -200,28 +199,26 @@ int loadTexture(string filePath, int &imgWidth, int &imgHeight)
     unsigned char *data = stbi_load(filePath.c_str(), &imgWidth, &imgHeight, &channels, 0);
     if (data)
     {
-        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB; // Determinar o formato da imagem
+        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
         glTexImage2D(GL_TEXTURE_2D, 0, format, imgWidth, imgHeight, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else
     {
         cout << "Erro ao carregar a textura: " << filePath << endl;
-        return -1; // Retornar erro se a textura não for carregada
+        return -1;
     }
-
     stbi_image_free(data);
-    return textureID; // Retornar o ID da textura carregada
+    return textureID;
 }
 
-
 // Lógica para movimentação do tanque
-void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime)
+void updateTank(Sprite &tank, Sprite &weapon, GLFWwindow *window, float deltaTime, bool isPlayer)
 {
     if (tank.isAlive)
     {
         // Controles do tanque do jogador
-        if (tank.texID == 0) { // Tanque A (jogador)
+        if (isPlayer) {
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
                 tank.position.x -= tankSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
@@ -233,11 +230,13 @@ void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime)
             if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
                 shootBullet(tank, bulletsA);
         } 
-        else { // Tanque B (máquina)
-            // Movimento automático
+        else { // Tanque controlado pela IA
             tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1);
             shootBullet(tank, bulletsB);
         }
+        
+        // Atualizar a posição da arma com o tanque
+        weapon.position = tank.position;
     }
 }
 
@@ -269,6 +268,32 @@ bool checkCollision(Sprite &tank, Sprite &bullet)
             tank.position.x + tank.dimensions.x > bullet.position.x &&
             tank.position.y < bullet.position.y + bullet.dimensions.y &&
             tank.position.y + tank.dimensions.y > bullet.position.y);
+}
+
+// Função para acionar a explosão ao colidir
+void triggerExplosion(Sprite &tank)
+{
+    // Aqui será carregada a textura de explosão para o tanque atingido
+    int imgWidth, imgHeight;
+    tank.texID = loadTexture("Texturas/battle-tank-game-assets/Effects/Explosion.png", imgWidth, imgHeight);
+}
+
+// Função para desenhar um sprite
+void drawSprite(Sprite spr, GLuint shaderID)
+{
+    glUseProgram(shaderID);
+    mat4 model = mat4(1.0f);
+    model = translate(model, spr.position);
+    model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
+    model = scale(model, spr.dimensions);
+    
+    GLuint modelLoc = glGetUniformLocation(shaderID, "model");
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, value_ptr(model));
+
+    glBindTexture(GL_TEXTURE_2D, spr.texID); // Vincular a textura do sprite
+    glBindVertexArray(spr.VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6); // Renderizar o sprite
+    glBindVertexArray(0);
 }
 
 // Configuração dos shaders
@@ -323,28 +348,4 @@ int setupShader()
     glDeleteShader(fragmentShader);
 
     return shaderProgram;
-}
-
-// Função para desenhar um sprite
-void drawSprite(Sprite spr, GLuint shaderID)
-{
-	glUseProgram(shaderID);
-
-	// Definir a matriz de projeção ortográfica no início do programa
-	mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
-	GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
-	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
-
-    mat4 model = mat4(1.0f);
-    model = translate(model, spr.position);
-    model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
-    model = scale(model, spr.dimensions);
-    
-    GLuint modelLoc = glGetUniformLocation(shaderID, "model");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, value_ptr(model));
-
-    glBindTexture(GL_TEXTURE_2D, spr.texID); // Vincular a textura do sprite
-    glBindVertexArray(spr.VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6); // Renderizar o sprite
-    glBindVertexArray(0);
 }
