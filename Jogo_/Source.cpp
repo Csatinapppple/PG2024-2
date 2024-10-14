@@ -120,10 +120,11 @@ int main()
 
     // Carregar texturas dos tanques e armas
     int imgWidth, imgHeight;
-    tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/Hulls_Color_A.png", imgWidth, imgHeight);
-    tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/Hulls_Color_B.png", imgWidth, imgHeight);
-    weaponA.texID = loadTexture("../Texturas/battle-tank-game-assets/Weapon_Color_A.png", imgWidth, imgHeight);
-    weaponB.texID = loadTexture("../Texturas/battle-tank-game-assets/Weapon_Color_B.png", imgWidth, imgHeight);
+    tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
+    tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
+    weaponA.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Weapon_Color_A/Weapon_Color_A.png", imgWidth, imgHeight);
+    weaponB.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Weapon_Color_B/Weapon_Color_B.png", imgWidth, imgHeight);
+
 
     // Carregamento dos shaders
     GLuint shaderProgram = setupShader();
@@ -134,6 +135,9 @@ int main()
         float currentTime = glfwGetTime();
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
+
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Definir cor de fundo para teste
+        glClear(GL_COLOR_BUFFER_BIT);
 
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -275,13 +279,16 @@ void triggerExplosion(Sprite &tank)
 {
     // Aqui será carregada a textura de explosão para o tanque atingido
     int imgWidth, imgHeight;
-    tank.texID = loadTexture("Texturas/battle-tank-game-assets/Effects/Explosion.png", imgWidth, imgHeight);
+    tank.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Effects/Explosion.png", imgWidth, imgHeight);
 }
 
 // Função para desenhar um sprite
 void drawSprite(Sprite spr, GLuint shaderID)
 {
     glUseProgram(shaderID);
+    mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+    GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
+    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
     mat4 model = mat4(1.0f);
     model = translate(model, spr.position);
     model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
