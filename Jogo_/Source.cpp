@@ -1,17 +1,14 @@
-/* Hello Triangle - código adaptado de https://learnopengl.com/#!Getting-started/Hello-Triangle
- *
+
+/* Jogo de Tanques 2D utilizando OpenGL e GLSL
  * Adaptado por Rossana Baptista Queiroz
  * para a disciplina de Processamento Gráfico - Unisinos
- * Versão inicial: 7/4/2017
- * Última atualização em 13/08/2024
- *
  */
 
 #include <iostream>
 #include <string>
-#include <assert.h>
-
-using namespace std;
+#include <vector>
+#include <cstdlib>
+#include <ctime>
 
 // GLAD
 #include <glad/glad.h>
@@ -28,24 +25,54 @@ using namespace std;
 #include <stb_image.h>
 
 using namespace glm;
+using namespace std;
 
+// Estrutura para representar os sprites
 struct Sprite
 {
-	GLuint VAO;
-	GLuint texID;
-	vec3 position;
-	vec3 dimensions;
-	float angle;
-	// Para controle da animação
-	int nAnimations, nFrames;
-	int iAnimation, iFrame;
-	vec2 d;
-	float FPS;
-	float lastTime;
+    GLuint VAO;
+    GLuint texID;
+    vec3 position;
+    vec3 dimensions;
+    float angle;
+    vec2 direction;
+    bool isShooting;
+    bool isAlive;
 
-	// Função de inicialização
-	void setupSprite(int texID, vec3 position, vec3 dimensions, int nFrames, int nAnimations);
+    void setupSprite(int texID, vec3 position, vec3 dimensions);
 };
+
+// Variáveis globais para controle
+const GLuint WIDTH = 800, HEIGHT = 600;
+Sprite tankA, tankB; // Tanques
+vector<Sprite> bulletsA, bulletsB; // Munição de ambos os tanques
+float tankSpeed = 300.0f;
+float bulletSpeed = 500.0f;
+float tankWidth = 0.2f, tankHeight = 0.2f;
+
+// Código fonte do Vertex Shader (em GLSL): ainda hardcoded
+const GLchar *vertexShaderSource = "#version 400\n"
+                                   "layout (location = 0) in vec3 position;\n"
+                                   "layout (location = 1) in vec2 texc;\n"
+                                   "uniform mat4 projection;\n"
+                                   "uniform mat4 model;\n"
+                                   "out vec2 texCoord;\n"
+                                   "void main()\n"
+                                   "{\n"
+                                   "gl_Position = projection * model * vec4(position.x, position.y, position.z, 1.0);\n"
+                                   "texCoord = vec2(texc.s, 1.0 - texc.t);\n"
+                                   "}\0";
+
+// Código fonte do Fragment Shader (em GLSL): ainda hardcoded
+const GLchar *fragmentShaderSource = "#version 400\n"
+                                     "in vec2 texCoord;\n"
+                                     "uniform sampler2D texBuffer;\n"
+                                     "uniform vec2 offsetTex;\n"
+                                     "out vec4 color;\n"
+                                     "void main()\n"
+                                     "{\n"
+                                     "color = texture(texBuffer, texCoord + offsetTex);\n"
+                                     "}\n\0";
 
 // Protótipo da função de callback de teclado
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
@@ -54,370 +81,264 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 int setupShader();
 int loadTexture(string filePath, int &imgWidth, int &imgHeight);
 void drawSprite(Sprite spr, GLuint shaderID);
+void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime);
+void shootBullet(Sprite &tank, vector<Sprite> &bullets);
+void updateBullets(vector<Sprite> &bullets, float deltaTime);
+bool checkCollision(Sprite &tank, Sprite &bullet);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-// Dimensões da janela (pode ser alterado em tempo de execução)
-const GLuint WIDTH = 800, HEIGHT = 600;
+// Inicializa o tanque
+void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
+    this->texID = texID;
+    this->position = pos;
+    this->dimensions = dim;
+    this->angle = 0.0f;
+    this->isShooting = false;
+    this->isAlive = true;
+    this->direction = vec2(1.0f, 0.0f); // Inicializa a direção padrão
+}
 
-// Código fonte do Vertex Shader (em GLSL): ainda hardcoded
-const GLchar *vertexShaderSource = "#version 400\n"
-								   "layout (location = 0) in vec3 position;\n"
-								   "layout (location = 1) in vec2 texc;\n"
-								   "uniform mat4 projection;\n"
-								   "uniform mat4 model;\n"
-								   "out vec2 texCoord;\n"
-								   "void main()\n"
-								   "{\n"
-								   //...pode ter mais linhas de código aqui!
-								   "gl_Position = projection * model * vec4(position.x, position.y, position.z, 1.0);\n"
-								   "texCoord = vec2(texc.s, 1.0 - texc.t);\n"
-								   "}\0";
-
-// Códifo fonte do Fragment Shader (em GLSL): ainda hardcoded
-const GLchar *fragmentShaderSource = "#version 400\n"
-									 "in vec2 texCoord;\n"
-									 "uniform sampler2D texBuffer;\n"
-									 "uniform vec2 offsetTex;\n"
-									 "out vec4 color;\n"
-									 "void main()\n"
-									 "{\n"
-									 "color = texture(texBuffer, texCoord + offsetTex);\n"
-									 "}\n\0";
-
-float vel = 1.2;
-
-bool keys[1024] = {false};
-
-// Função MAIN
+// Função principal
 int main()
 {
-	// Inicialização da GLFW
-	glfwInit();
+    srand(time(0)); // Semente para a geração aleatória de números
 
-	// Muita atenção aqui: alguns ambientes não aceitam essas configurações
-	// Você deve adaptar para a versão do OpenGL suportada por sua placa
-	// Sugestão: comente essas linhas de código para desobrir a versão e
-	// depois atualize (por exemplo: 4.5 com 4 e 5)
-	/*glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);*/
+    // Inicialização do GLFW e criação da janela
+    glfwInit();
+    GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo de Tanques", NULL, NULL);
+    glfwMakeContextCurrent(window);
+    glfwSetKeyCallback(window, key_callback);
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-	// Essencial para computadores da Apple
-	// #ifdef __APPLE__
-	//	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	// #endif
+    // Configuração inicial dos tanques
+	tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+	tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
 
-	// Criação da janela GLFW
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo -GA", nullptr, nullptr);
-	glfwMakeContextCurrent(window);
-
-	// Fazendo o registro da função de callback para a janela GLFW
-	glfwSetKeyCallback(window, key_callback);
-
-	// GLAD: carrega todos os ponteiros d funções da OpenGL
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
-	}
-
-	// Obtendo as informações de versão
-	const GLubyte *renderer = glGetString(GL_RENDERER); /* get renderer string */
-	const GLubyte *version = glGetString(GL_VERSION);	/* version as a string */
-	cout << "Renderer: " << renderer << endl;
-	cout << "OpenGL version supported " << version << endl;
-
-	// Definindo as dimensões da viewport com as mesmas dimensões da janela da aplicação
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
-	glViewport(0, 0, width, height);
-
-	// Compilando e buildando o programa de shader
-	GLuint shaderID = setupShader();
-
-	// Gerando um buffer simples, com a geometria de um triângulo
-	// Sprite do fundo da cena
-	Sprite background, character;
-	// Carregando uma textura (recebendo seu ID)
-
-	// Inicializando a sprite do background
+	// Carregamento das texturas dos tanques
 	int imgWidth, imgHeight;
-	int texID = loadTexture("../Texturas/backgrounds/PNG/Battleground3/Bright/Battleground3.png", imgWidth, imgHeight);
-	background.setupSprite(texID, vec3(400.0, 300.0, 0.0), vec3(imgWidth * 0.5, imgHeight * 0.5, 1.0), 1, 1);
+	tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
+	tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
 
-	// Inicializando a sprite do personagem
-	texID = loadTexture("../Texturas/characters/PNG/1 Pink_Monster/Pink_Monster_Walk_6.png", imgWidth, imgHeight);
-	character.setupSprite(texID, vec3(50.0, 200.0, 0.0), vec3(imgWidth / 6.0 * 2.0, imgHeight * 2.0, 1.0), 6, 1);
 
-	glUseProgram(shaderID);
+    // Carregamento dos shaders
+    GLuint shaderProgram = setupShader();
 
-	// Enviando a cor desejada (vec4) para o fragment shader
-	// Utilizamos a variáveis do tipo uniform em GLSL para armazenar esse tipo de info
-	// que não está nos buffers
-	glUniform1i(glGetUniformLocation(shaderID, "texBuffer"), 0);
+    float lastTime = glfwGetTime();
+    while (!glfwWindowShouldClose(window))
+    {
+        float currentTime = glfwGetTime();
+        float deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
 
-	// Matriz de projeção ortográfica
-	mat4 projection = ortho(0.0f, 800.0f, 0.0f, 600.0f, -1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Definir cor de fundo
+		glClear(GL_COLOR_BUFFER_BIT);          // Limpar a tela com a cor definida
 
-	// Ativando o primeiro buffer de textura da OpenGL
-	glActiveTexture(GL_TEXTURE0);
+        // Atualiza os tanques
+        updateTank(tankA, window, deltaTime);
+        updateTank(tankB, window, deltaTime);
 
-	// Habilitar a transparência
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Atualiza as balas
+        updateBullets(bulletsA, deltaTime);
+        updateBullets(bulletsB, deltaTime);
 
-	// Habilitar o teste de profundidade
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_ALWAYS);
+        // Verifica colisões
+        for (auto &bullet : bulletsA) {
+            if (checkCollision(tankB, bullet)) {
+                tankB.isAlive = false;
+            }
+        }
+        for (auto &bullet : bulletsB) {
+            if (checkCollision(tankA, bullet)) {
+                tankA.isAlive = false;
+            }
+        }
 
-	// for (int i=0; i< 1024; i++) keys[i] = false;
+        // Renderização dos sprites
+        drawSprite(tankA, shaderProgram);
+        drawSprite(tankB, shaderProgram);
 
-	// Loop da aplicação - "game loop"
-	while (!glfwWindowShouldClose(window))
-	{
-		// Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
-		glfwPollEvents();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
 
-		// Limpa o buffer de cor
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		vec2 offsetTex = vec2(0.0, 0.0);
-		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t);
-		drawSprite(background, shaderID);
-		if (keys[GLFW_KEY_LEFT] || keys[GLFW_KEY_A])
-			character.position.x -= vel;
-		if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D])
-			character.position.x += vel;
-		if (keys[GLFW_KEY_UP] || keys[GLFW_KEY_W])
-			character.position.y += vel;
-		if (keys[GLFW_KEY_DOWN] || keys[GLFW_KEY_S])
-			character.position.y -= vel;
-		// Incremento circular (em loop) do índice do frame
-
-		float now = glfwGetTime();
-		float dt = now - character.lastTime;
-		if (dt >= 1.0 / character.FPS)
-		{
-			character.iFrame = (character.iFrame + 1) % character.nFrames; // incrementando ciclicamente o indice do Frame
-			character.lastTime = now;
-		}	
-		offsetTex.s = character.iFrame * character.d.s;
-		offsetTex.t = 0.0;
-		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t);
-		drawSprite(character, shaderID);
-
-		// Troca os buffers da tela
-		glfwSwapBuffers(window);
-	}
-	// Pede pra OpenGL desalocar os buffers
-	// glDeleteVertexArrays(1, background.VAO);
-	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
-	glfwTerminate();
-	return 0;
+    glfwTerminate();
+    return 0;
 }
 
-// Função de callback de teclado - só pode ter uma instância (deve ser estática se
-// estiver dentro de uma classe) - É chamada sempre que uma tecla for pressionada
-// ou solta via GLFW
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode)
+// Função de callback de teclado
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, GL_TRUE);
-
-	if (action == GLFW_PRESS)
-	{
-		keys[key] = true;
-	}
-	if (action == GLFW_RELEASE)
-	{
-		keys[key] = false;
-	}
-}
-
-// Esta função está basntante hardcoded - objetivo é compilar e "buildar" um programa de
-//  shader simples e único neste exemplo de código
-//  O código fonte do vertex e fragment shader está nos arrays vertexShaderSource e
-//  fragmentShader source no iniçio deste arquivo
-//  A função retorna o identificador do programa de shader
-int setupShader()
-{
-	// Vertex shader
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
-	// Checando erros de compilação (exibição via log no terminal)
-	GLint success;
-	GLchar infoLog[512];
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-				  << infoLog << std::endl;
-	}
-	// Fragment shader
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
-	// Checando erros de compilação (exibição via log no terminal)
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-				  << infoLog << std::endl;
-	}
-	// Linkando os shaders e criando o identificador do programa de shader
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-	// Checando por erros de linkagem
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success)
-	{
-		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-				  << infoLog << std::endl;
-	}
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	return shaderProgram;
-}
-
-// Esta função está bastante harcoded - objetivo é criar os buffers que armazenam a
-// geometria de um triângulo
-// Apenas atributo coordenada nos vértices
-// 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
-// A função retorna o identificador do VAO
-void Sprite::setupSprite(int texID, vec3 position, vec3 dimensions, int nFrames, int nAnimations)
-{
-	this->texID = texID;
-	this->dimensions = dimensions;
-	this->position = position;
-	this->nAnimations = nAnimations;
-	this->nFrames = nFrames;
-	iAnimation = 0;
-	iFrame = 0;
-
-	d.s = 1.0 / (float)nFrames;
-	d.t = 1.0 / (float)nAnimations;
-	// Aqui setamos as coordenadas x, y e z do triângulo e as armazenamos de forma
-	// sequencial, já visando mandar para o VBO (Vertex Buffer Objects)
-	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc)
-	// Pode ser arazenado em um VBO único ou em VBOs separados
-	GLfloat vertices[] = {
-		// x   y     z    s     		t
-		// T0
-		-0.5, -0.5, 0.0, 0.0, 0.0, // V0
-		-0.5, 0.5, 0.0, 0.0, d.t,  // V1
-		0.5, -0.5, 0.0, d.s, 0.0,  // V2
-		0.5, 0.5, 0.0, d.s, d.t	   // V3
-
-	};
-
-	GLuint VBO, VAO;
-	// Geração do identificador do VBO
-	glGenBuffers(1, &VBO);
-	// Faz a conexão (vincula) do buffer como um buffer de array
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	// Envia os dados do array de floats para o buffer da OpenGl
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	// Geração do identificador do VAO (Vertex Array Object)
-	glGenVertexArrays(1, &VAO);
-	// Vincula (bind) o VAO primeiro, e em seguida  conecta e seta o(s) buffer(s) de vértices
-	// e os ponteiros para os atributos
-	glBindVertexArray(VAO);
-	// Para cada atributo do vertice, criamos um "AttribPointer" (ponteiro para o atributo), indicando:
-	//  Localização no shader * (a localização dos atributos devem ser correspondentes no layout especificado no vertex shader)
-	//  Numero de valores que o atributo tem (por ex, 3 coordenadas xyz)
-	//  Tipo do dado
-	//  Se está normalizado (entre zero e um)
-	//  Tamanho em bytes
-	//  Deslocamento a partir do byte zero
-
-	// Atributo 0 - Posição - x, y, z
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
-	glEnableVertexAttribArray(0);
-
-	// Atributo 1 - Coordenadas de textura - s, t
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3 * sizeof(GLfloat)));
-	glEnableVertexAttribArray(1);
-
-	// Observe que isso é permitido, a chamada para glVertexAttribPointer registrou o VBO como o objeto de buffer de vértice
-	// atualmente vinculado - para que depois possamos desvincular com segurança
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	// Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
-	glBindVertexArray(0);
-	this->VAO = VAO;
-	FPS = 12.0;
-	lastTime = 0.0;
+    if (action == GLFW_PRESS || action == GLFW_REPEAT)
+    {
+        if (key == GLFW_KEY_ESCAPE) // Fecha a janela se a tecla ESC for pressionada
+            glfwSetWindowShouldClose(window, true);
+    }
 }
 
 int loadTexture(string filePath, int &imgWidth, int &imgHeight)
 {
-	GLuint texID;
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
 
-	// Gera o identificador da textura na memória
-	glGenTextures(1, &texID);
-	glBindTexture(GL_TEXTURE_2D, texID);
+    // Configurar parâmetros de textura
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	// Configurando o wrapping da textura
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Carregar a imagem usando stb_image
+    int channels;
+    unsigned char *data = stbi_load(filePath.c_str(), &imgWidth, &imgHeight, &channels, 0);
+    if (data)
+    {
+        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB; // Determinar o formato da imagem
+        glTexImage2D(GL_TEXTURE_2D, 0, format, imgWidth, imgHeight, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        cout << "Erro ao carregar a textura: " << filePath << endl;
+        return -1; // Retornar erro se a textura não for carregada
+    }
 
-	// Configurando o filtering de minificação e magnificação da textura
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// Carregamento da imagem da textura
-	int nrChannels;
-	unsigned char *data = stbi_load(filePath.c_str(), &imgWidth, &imgHeight, &nrChannels, 0);
-
-	if (data)
-	{
-		if (nrChannels == 3) // jpg, bmp
-		{
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgWidth, imgHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-		}
-		else // png
-		{
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		}
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else
-	{
-		std::cout << "Failed to load texture" << filePath << std::endl;
-	}
-
-	return texID;
+    stbi_image_free(data);
+    return textureID; // Retornar o ID da textura carregada
 }
 
+
+// Lógica para movimentação do tanque
+void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime)
+{
+    if (tank.isAlive)
+    {
+        // Controles do tanque do jogador
+        if (tank.texID == 0) { // Tanque A (jogador)
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+                tank.position.x -= tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+                tank.position.x += tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+                tank.position.y += tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+                tank.position.y -= tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+                shootBullet(tank, bulletsA);
+        } 
+        else { // Tanque B (máquina)
+            // Movimento automático
+            tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1);
+            shootBullet(tank, bulletsB);
+        }
+    }
+}
+
+// Função para disparar uma bala
+void shootBullet(Sprite &tank, vector<Sprite> &bullets)
+{
+    if (!tank.isShooting)
+    {
+        Sprite bullet;
+        bullet.setupSprite(2, tank.position, vec3(0.05f, 0.05f, 1.0f));
+        bullets.push_back(bullet);
+        tank.isShooting = true;
+    }
+}
+
+// Atualiza as balas
+void updateBullets(vector<Sprite> &bullets, float deltaTime)
+{
+    for (auto &bullet : bullets)
+    {
+        bullet.position.y += bulletSpeed * deltaTime;
+    }
+}
+
+// Verifica se houve colisão entre o tanque e uma bala
+bool checkCollision(Sprite &tank, Sprite &bullet)
+{
+    return (tank.position.x < bullet.position.x + bullet.dimensions.x &&
+            tank.position.x + tank.dimensions.x > bullet.position.x &&
+            tank.position.y < bullet.position.y + bullet.dimensions.y &&
+            tank.position.y + tank.dimensions.y > bullet.position.y);
+}
+
+// Configuração dos shaders
+int setupShader()
+{
+    // Compilação do Vertex Shader
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+    
+    // Verificar erros de compilação
+    int success;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        cout << "Erro na compilação do Vertex Shader: " << infoLog << endl;
+    }
+
+    // Compilação do Fragment Shader
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+    
+    // Verificar erros de compilação
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        cout << "Erro na compilação do Fragment Shader: " << infoLog << endl;
+    }
+
+    // Linkar os shaders
+    GLuint shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+    // Verificar erros de linkagem
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        cout << "Erro na linkagem dos shaders: " << infoLog << endl;
+    }
+
+    // Deletar shaders (eles já estão linkados no programa)
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    return shaderProgram;
+}
+
+// Função para desenhar um sprite
 void drawSprite(Sprite spr, GLuint shaderID)
 {
-	glBindVertexArray(spr.VAO); // Conectando ao buffer de geometria
+	glUseProgram(shaderID);
 
-	glBindTexture(GL_TEXTURE_2D, spr.texID); // conectando o buffer de textura
+	// Definir a matriz de projeção ortográfica no início do programa
+	mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+	GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
+	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
 
-	// Matriz de modelo - Tranformações na geometria, nos objetos
-	mat4 model = mat4(1); // matriz identidade
-	// Translação
-	model = translate(model, spr.position);
-	// Rotação
-	model = rotate(model, radians(spr.angle), vec3(0.0, 0.0, 1.0));
-	// Escala
-	model = scale(model, spr.dimensions);
-	// Enviar para o shader
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+    mat4 model = mat4(1.0f);
+    model = translate(model, spr.position);
+    model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
+    model = scale(model, spr.dimensions);
+    
+    GLuint modelLoc = glGetUniformLocation(shaderID, "model");
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, value_ptr(model));
 
-	// Chamada de desenho - drawcall
-	// Poligono Preenchido - GL_TRIANGLES
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glBindVertexArray(0); // Desconectando o buffer de geometria
+    glBindTexture(GL_TEXTURE_2D, spr.texID); // Vincular a textura do sprite
+    glBindVertexArray(spr.VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6); // Renderizar o sprite
+    glBindVertexArray(0);
 }
