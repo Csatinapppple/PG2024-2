@@ -326,9 +326,17 @@ void triggerExplosion(Sprite &tank)
 void drawSprite(Sprite spr, GLuint shaderID)
 {
     glUseProgram(shaderID);
+
+    // Certificar que o slot de textura correto está ativado
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, spr.texID);
+
+    // Matriz de projeção ortográfica
     mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
     GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
     glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
+
+    // Matriz de transformação do modelo
     mat4 model = mat4(1.0f);
     model = translate(model, spr.position);
     model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
@@ -337,7 +345,6 @@ void drawSprite(Sprite spr, GLuint shaderID)
     GLuint modelLoc = glGetUniformLocation(shaderID, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, value_ptr(model));
 
-    glBindTexture(GL_TEXTURE_2D, spr.texID); // Vincular a textura do sprite
     glBindVertexArray(spr.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6); // Renderizar o sprite
     glBindVertexArray(0);
