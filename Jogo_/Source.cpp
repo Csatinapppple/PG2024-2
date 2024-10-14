@@ -30,7 +30,7 @@ using namespace std;
 // Estrutura para representar os sprites
 struct Sprite
 {
-    GLuint VAO;
+    GLuint VAO, VBO;
     GLuint texID;
     vec3 position;
     vec3 dimensions;
@@ -40,7 +40,9 @@ struct Sprite
     bool isAlive;
 
     void setupSprite(int texID, vec3 position, vec3 dimensions);
+    void initializeVAO(); // Função para inicializar o VAO e VBO
 };
+
 
 // Variáveis globais para controle
 const GLuint WIDTH = 800, HEIGHT = 600;
@@ -99,6 +101,38 @@ void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
     this->direction = vec2(1.0f, 0.0f); // Inicializa a direção padrão
 }
 
+void Sprite::initializeVAO()
+{
+    float vertices[] = {
+        // Posições         // Coordenadas de textura
+        0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+        0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
+       -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+
+        0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+       -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+       -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
+    };
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // Atributos de posição
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Atributos de coordenadas de textura
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 // Função principal
 int main()
 {
@@ -113,10 +147,16 @@ int main()
 
     // Configuração inicial dos tanques e armas
     tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankA.initializeVAO(); // Inicializar o VAO do tanque A
+
     tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankB.initializeVAO(); // Inicializar o VAO do tanque B
 
     weaponA.setupSprite(2, vec3(-0.5f, -0.75f, 0.0f), vec3(tankWidth / 2.0f, tankHeight / 2.0f, 1.0f));
+    weaponA.initializeVAO(); // Inicializar o VAO da arma A
+
     weaponB.setupSprite(3, vec3(0.5f, 0.75f, 0.0f), vec3(tankWidth / 2.0f, tankHeight / 2.0f, 1.0f));
+    weaponB.initializeVAO(); // Inicializar o VAO da arma B
 
     // Carregar texturas dos tanques e armas
     int imgWidth, imgHeight;
