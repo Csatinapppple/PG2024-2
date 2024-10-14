@@ -88,7 +88,13 @@ int main()
 {
     srand(time(0)); // Semente para a geração aleatória de números
     // Inicialização do GLFW e criação da janela
+
+
     glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo de Tanques", NULL, NULL);
     glfwMakeContextCurrent(window);
     glfwSetKeyCallback(window, key_callback);
