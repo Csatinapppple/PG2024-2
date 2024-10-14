@@ -241,6 +241,15 @@ int loadTexture(string filePath, int &imgWidth, int &imgHeight)
     // Carregar a imagem usando stb_image
     int channels;
     unsigned char *data = stbi_load(filePath.c_str(), &imgWidth, &imgHeight, &channels, 0);
+
+    if (!data) {
+    cout << "Erro ao carregar a textura: " << filePath << endl;
+    return -1; // <-- Esta parte já existe
+    }
+    else {
+        cout << "Textura carregada com sucesso: " << filePath << endl; // <-- ADICIONAR ESTA LINHA PARA DEPURAÇÃO
+    }
+
     if (data)
     {
         GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
@@ -273,6 +282,7 @@ void updateTank(Sprite &tank, Sprite &weapon, GLFWwindow *window, float deltaTim
                 tank.position.y -= tankSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
                 shootBullet(tank, bulletsA);
+
         } 
         else { // Tanque controlado pela IA
             tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1);
@@ -328,8 +338,8 @@ void drawSprite(Sprite spr, GLuint shaderID)
     glUseProgram(shaderID);
 
     // Certificar que o slot de textura correto está ativado
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, spr.texID);
+    glActiveTexture(GL_TEXTURE0); // <-- ADICIONAR ESTA LINHA
+    glBindTexture(GL_TEXTURE_2D, spr.texID); // Já está no código
 
     // Matriz de projeção ortográfica
     mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
