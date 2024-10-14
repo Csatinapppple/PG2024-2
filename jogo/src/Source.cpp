@@ -9,13 +9,13 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
-
 // GLAD
 #include "../include/glad.h"
 
 // GLFW
 #include <GLFW/glfw3.h>
 
+#include "../include/tools.hpp"
 // GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -52,28 +52,11 @@ float bulletSpeed = 500.0f;
 float tankWidth = 0.2f, tankHeight = 0.2f;
 
 // Código fonte do Vertex Shader (em GLSL): ainda hardcoded
-const GLchar *vertexShaderSource = "#version 400\n"
-                                   "layout (location = 0) in vec3 position;\n"
-                                   "layout (location = 1) in vec2 texc;\n"
-                                   "uniform mat4 projection;\n"
-                                   "uniform mat4 model;\n"
-                                   "out vec2 texCoord;\n"
-                                   "void main()\n"
-                                   "{\n"
-                                   "gl_Position = projection * model * vec4(position.x, position.y, position.z, 1.0);\n"
-                                   "texCoord = vec2(texc.s, 1.0 - texc.t);\n"
-                                   "}\0";
-
+std::string vertShaderSource = getFileContent("./src/shaders/vertexShader.glsl");
+const GLchar* vertexShaderSource = vertShaderSource.c_str();
 // Código fonte do Fragment Shader (em GLSL): ainda hardcoded
-const GLchar *fragmentShaderSource = "#version 400\n"
-                                     "in vec2 texCoord;\n"
-                                     "uniform sampler2D texBuffer;\n"
-                                     "uniform vec2 offsetTex;\n"
-                                     "out vec4 color;\n"
-                                     "void main()\n"
-                                     "{\n"
-                                     "color = texture(texBuffer, texCoord + offsetTex);\n"
-                                     "}\n\0";
+std::string fragShaderSource = getFileContent("./src/shaders/fragmentShader.glsl");
+const GLchar* fragmentShaderSource = fragShaderSource.c_str();
 
 // Protótipo da função de callback de teclado
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
@@ -103,7 +86,6 @@ void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
 int main()
 {
     srand(time(0)); // Semente para a geração aleatória de números
-
     // Inicialização do GLFW e criação da janela
     glfwInit();
     GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo de Tanques", NULL, NULL);
