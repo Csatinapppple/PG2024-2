@@ -117,8 +117,8 @@ int main()
 
 	// Carregamento das texturas dos tanques
 	int imgWidth, imgHeight;
-	tankA.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
-	tankB.texID = loadTexture("../Texturas/battle-tank-game-assets/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
+	tankA.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_A/Hulls_Color_A.png", imgWidth, imgHeight);
+	tankB.texID = loadTexture("../Texturas/tank/PNG/Hulls_Color_B/Hulls_Color_B.png", imgWidth, imgHeight);
 
 
     // Carregamento dos shaders
