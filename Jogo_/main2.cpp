@@ -9,11 +9,12 @@
 
 #include <iostream>
 #include <string>
-#include <assert.h>
-using namespace std;
+#include <vector>
+#include <cstdlib>
+#include <ctime>
 
 // GLAD
-#include "./include/glad.h"
+#include <glad/glad.h>
 
 // GLFW
 #include <GLFW/glfw3.h>
@@ -24,11 +25,12 @@ using namespace std;
 #include <glm/gtc/type_ptr.hpp>
 
 // STB_IMAGE
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "./include/tools.hpp"
 using namespace glm;
+using namespace std;
+
+#include "./include/tools.hpp"
 
 struct Sprite
 {
