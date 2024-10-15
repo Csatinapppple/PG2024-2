@@ -164,7 +164,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Atualiza os tanques e munições
-        updateTank(tankA, window, deltaTime, false);  // Tanque A controlado pela IA
+        updateTank(tankA, window, deltaTime, false);  // Tanque A controlado pelo computador
         updateTank(tankB, window, deltaTime, true);   // Tanque B controlado pelo jogador
 
         updateBullets(bulletsA, deltaTime);
@@ -380,7 +380,7 @@ void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime, bool isPlayer
             if (tank.position.x < -BOUNDARY_LIMIT) tank.position.x = -BOUNDARY_LIMIT; // Limite esquerdo
 
             if (rand() % 100 < 5) { // Chance de disparar aleatoriamente
-                shootBullet(tank, bulletsA); // Disparar a munição da IA
+                shootBullet(tank, bulletsA); // Disparar a munição do computador
             }
         }
     }
