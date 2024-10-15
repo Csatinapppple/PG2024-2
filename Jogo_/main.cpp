@@ -39,10 +39,12 @@ struct Sprite
 
 // Variáveis globais
 const GLuint WIDTH = 800, HEIGHT = 600;
-Sprite tankA, tankB, municaoA, municaoB; // Tanques e munições
+const float BOUNDARY_LIMIT = 0.85f; // Definir o limite da janela para os tanques não sumirem
+
+Sprite tankA, tankB; // Tanques
 vector<Sprite> bulletsA, bulletsB; // Munição dos tanques
-float tankSpeed = 300.0f;
-float bulletSpeed = 500.0f;
+float tankSpeed = 50.0f;  // Diminuir ainda mais a velocidade dos tanques
+float bulletSpeed = 100.0f;  // Diminuir a velocidade da munição
 float tankWidth = 0.2f, tankHeight = 0.2f;
 bool explosion = false; // Controle de explosão
 
@@ -133,6 +135,10 @@ int main()
     glfwSetKeyCallback(window, key_callback);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
+    // Ativar a transparência
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     // Configuração inicial dos tanques
     tankA.setupSprite(0, vec3(-0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
     tankA.initializeVAO();
@@ -140,18 +146,10 @@ int main()
     tankB.setupSprite(1, vec3(0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
     tankB.initializeVAO();
 
-    municaoA.setupSprite(2, vec3(-0.5f, 0.75f, 0.0f), vec3(0.05f, 0.1f, 1.0f));
-    municaoA.initializeVAO();
-
-    municaoB.setupSprite(3, vec3(0.5f, -0.75f, 0.0f), vec3(0.05f, 0.1f, 1.0f));
-    municaoB.initializeVAO();
-
     // Carregamento das texturas dos tanques
     int imgWidth, imgHeight;
     tankA.texID = loadTexture("../Texturas/tank_simples/tank_a/tank_a.png", imgWidth, imgHeight);
     tankB.texID = loadTexture("../Texturas/tank_simples/tank_b/tank_b.png", imgWidth, imgHeight);
-    municaoA.texID = loadTexture("../Texturas/tank_simples/efeitos/Municao_DOWN.png", imgWidth, imgHeight);
-    municaoB.texID = loadTexture("../Texturas/tank_simples/efeitos/Municao_UP.png", imgWidth, imgHeight);
 
     // Carregar shaders
     GLuint shaderProgram = setupShader();
@@ -166,8 +164,8 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Atualiza os tanques e munições
-        updateTank(tankA, window, deltaTime, true);
-        updateTank(tankB, window, deltaTime, false);
+        updateTank(tankA, window, deltaTime, false);  // Tanque A controlado pela IA
+        updateTank(tankB, window, deltaTime, true);   // Tanque B controlado pelo jogador
 
         updateBullets(bulletsA, deltaTime);
         updateBullets(bulletsB, deltaTime);
@@ -188,9 +186,7 @@ int main()
 
         // Renderização dos sprites
         drawSprite(tankA, shaderProgram);
-        drawSprite(municaoA, shaderProgram);
         drawSprite(tankB, shaderProgram);
-        drawSprite(municaoB, shaderProgram);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -214,6 +210,7 @@ int loadTexture(string filePath, int &imgWidth, int &imgHeight)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Carregar a imagem usando stb_image
+
     int channels;
     unsigned char *data = stbi_load(filePath.c_str(), &imgWidth, &imgHeight, &channels, 0);
     if (data)
@@ -316,13 +313,9 @@ void drawSprite(Sprite spr, GLuint shaderID)
 // Função para disparar uma bala
 void shootBullet(Sprite &tank, vector<Sprite> &bullets)
 {
-    if (!tank.isShooting)
-    {
-        Sprite bullet;
-        bullet.setupSprite(tank.texID, tank.position, vec3(0.05f, 0.1f, 1.0f)); // Tamanho da bala
-        bullets.push_back(bullet);
-        tank.isShooting = true;
-    }
+    Sprite bullet;
+    bullet.setupSprite(tank.texID, vec3(tank.position.x, tank.position.y, 0.0f), vec3(0.05f, 0.1f, 1.0f)); // Tamanho da bala
+    bullets.push_back(bullet);
 }
 
 // Atualiza as balas
@@ -368,26 +361,26 @@ void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime, bool isPlayer
     {
         // Controles do tanque do jogador
         if (isPlayer) {
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS && tank.position.x > -BOUNDARY_LIMIT)
                 tank.position.x -= tankSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS && tank.position.x < BOUNDARY_LIMIT)
                 tank.position.x += tankSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && tank.position.y < 0.7f) // Limite superior do movimento
                 tank.position.y += tankSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && tank.position.y > -0.9f) // Limite inferior do movimento
                 tank.position.y -= tankSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-                shootBullet(tank, bulletsA); // Atirar
+                shootBullet(tank, bulletsB); // Atirar do tanque do jogador
         }
         else {
             // Movimento do tanque da IA
             tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1); // Movimento lateral aleatório
 
-            if (tank.position.x > 0.9f) tank.position.x = 0.9f; // Limite direito
-            if (tank.position.x < -0.9f) tank.position.x = -0.9f; // Limite esquerdo
+            if (tank.position.x > BOUNDARY_LIMIT) tank.position.x = BOUNDARY_LIMIT; // Limite direito
+            if (tank.position.x < -BOUNDARY_LIMIT) tank.position.x = -BOUNDARY_LIMIT; // Limite esquerdo
 
             if (rand() % 100 < 5) { // Chance de disparar aleatoriamente
-                shootBullet(tank, bulletsB); // Disparar a munição da IA
+                shootBullet(tank, bulletsA); // Disparar a munição da IA
             }
         }
     }
