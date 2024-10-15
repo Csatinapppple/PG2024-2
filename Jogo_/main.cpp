@@ -118,7 +118,7 @@ int main()
 	// #endif
 
 	// Criação da janela GLFW
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo GA - Processamento Gráfico 2024/2 - Bruno Silva da Silva, Cristian, Renan", nullptr, nullptr);
+	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo GA - Processamento Gráfico 2024/2 - Bruno Silva da Silva, Chistian Aguiar Plentz, Renan Zampeze", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Fazendo o registro da função de callback para a janela GLFW
