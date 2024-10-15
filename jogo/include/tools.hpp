@@ -4,7 +4,6 @@
 #include <string>
 #include <fstream>
 #include <GLFW/glfw3.h>
-#include "./glad.h"
 
 std::string
 getFileContent(const std::string& path)
