@@ -1,9 +1,3 @@
-
-/* Jogo de Tanques 2D utilizando OpenGL e GLSL
- * Adaptado por Rossana Baptista Queiroz
- * para a disciplina de Processamento Gráfico - Unisinos
- */
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -12,8 +6,6 @@
 
 // GLAD
 #include <glad/glad.h>
-
-#include "./include/tools.hpp"
 
 // GLFW
 #include <GLFW/glfw3.h>
@@ -32,7 +24,7 @@ using namespace std;
 // Estrutura para representar os sprites
 struct Sprite
 {
-    GLuint VAO;
+    GLuint VAO, VBO;
     GLuint texID;
     vec3 position;
     vec3 dimensions;
@@ -42,35 +34,52 @@ struct Sprite
     bool isAlive;
 
     void setupSprite(int texID, vec3 position, vec3 dimensions);
+    void initializeVAO(); // Função para inicializar o VAO e VBO
 };
 
-// Variáveis globais para controle
+// Variáveis globais
 const GLuint WIDTH = 800, HEIGHT = 600;
-Sprite tankA, tankB; // Tanques
-vector<Sprite> bulletsA, bulletsB; // Munição de ambos os tanques
+Sprite tankA, tankB, municaoA, municaoB; // Tanques e munições
+vector<Sprite> bulletsA, bulletsB; // Munição dos tanques
 float tankSpeed = 300.0f;
 float bulletSpeed = 500.0f;
 float tankWidth = 0.2f, tankHeight = 0.2f;
+bool explosion = false; // Controle de explosão
 
-// Código fonte do Vertex Shader (em GLSL): ainda hardcoded
-std::string vertShaderSource = getFileContent("./include/vertexShader.glsl");
-const GLchar* vertexShaderSource = vertShaderSource.c_str();
-// Código fonte do Fragment Shader (em GLSL): ainda hardcoded
-std::string fragShaderSource = getFileContent("./include/fragmentShader.glsl");
-const GLchar* fragmentShaderSource = fragShaderSource.c_str();
+// Código fonte do Vertex Shader (em GLSL): hardcoded
+const GLchar *vertexShaderSource = "#version 400\n"
+                                   "layout (location = 0) in vec3 position;\n"
+                                   "layout (location = 1) in vec2 texc;\n"
+                                   "uniform mat4 projection;\n"
+                                   "uniform mat4 model;\n"
+                                   "out vec2 texCoord;\n"
+                                   "void main()\n"
+                                   "{\n"
+                                   "gl_Position = projection * model * vec4(position.x, position.y, position.z, 1.0);\n"
+                                   "texCoord = vec2(texc.s, 1.0 - texc.t);\n"
+                                   "}\0";
 
-// Protótipo da função de callback de teclado
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
+// Código fonte do Fragment Shader (em GLSL): hardcoded
+const GLchar *fragmentShaderSource = "#version 400\n"
+                                     "in vec2 texCoord;\n"
+                                     "uniform sampler2D texBuffer;\n"
+                                     "uniform vec2 offsetTex;\n"
+                                     "out vec4 color;\n"
+                                     "void main()\n"
+                                     "{\n"
+                                     "color = texture(texBuffer, texCoord + offsetTex);\n"
+                                     "}\n\0";
 
 // Protótipos das funções
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 int setupShader();
 int loadTexture(string filePath, int &imgWidth, int &imgHeight);
 void drawSprite(Sprite spr, GLuint shaderID);
-void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime);
+void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime, bool isPlayer);
 void shootBullet(Sprite &tank, vector<Sprite> &bullets);
 void updateBullets(vector<Sprite> &bullets, float deltaTime);
 bool checkCollision(Sprite &tank, Sprite &bullet);
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void triggerExplosion(Sprite &tank);
 
 // Inicializa o tanque
 void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
@@ -83,34 +92,68 @@ void Sprite::setupSprite(int texID, vec3 pos, vec3 dim) {
     this->direction = vec2(1.0f, 0.0f); // Inicializa a direção padrão
 }
 
+void Sprite::initializeVAO()
+{
+    float vertices[] = {
+        // Posições         // Coordenadas de textura
+        0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+        0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
+       -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+
+        0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+       -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+       -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
+    };
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 // Função principal
 int main()
 {
-    srand(time(0)); // Semente para a geração aleatória de números
-    // Inicialização do GLFW e criação da janela
-
+    srand(time(0)); // Semente para geração de números aleatórios
 
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo de Tanques", NULL, NULL);
     glfwMakeContextCurrent(window);
     glfwSetKeyCallback(window, key_callback);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
     // Configuração inicial dos tanques
-	tankA.setupSprite(0, vec3(-0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
-	tankB.setupSprite(1, vec3(0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankA.setupSprite(0, vec3(-0.5f, 0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankA.initializeVAO();
 
-	// Carregamento das texturas dos tanqu
-	int imgWidth, imgHeight;
-	tankA.texID = loadTexture("../Texturas/tank_a/tank_a.png", imgWidth, imgHeight);
-	tankB.texID = loadTexture("../Texturas/tank_b/tank_b.png", imgWidth, imgHeight);
+    tankB.setupSprite(1, vec3(0.5f, -0.9f, 0.0f), vec3(tankWidth, tankHeight, 1.0f));
+    tankB.initializeVAO();
 
+    municaoA.setupSprite(2, vec3(-0.5f, 0.75f, 0.0f), vec3(0.05f, 0.1f, 1.0f));
+    municaoA.initializeVAO();
 
-    // Carregamento dos shaders
+    municaoB.setupSprite(3, vec3(0.5f, -0.75f, 0.0f), vec3(0.05f, 0.1f, 1.0f));
+    municaoB.initializeVAO();
+
+    // Carregamento das texturas dos tanques
+    int imgWidth, imgHeight;
+    tankA.texID = loadTexture("../Texturas/tank_simples/tank_a/tank_a.png", imgWidth, imgHeight);
+    tankB.texID = loadTexture("../Texturas/tank_simples/tank_b/tank_b.png", imgWidth, imgHeight);
+    municaoA.texID = loadTexture("../Texturas/tank_simples/efeitos/Municao_DOWN.png", imgWidth, imgHeight);
+    municaoB.texID = loadTexture("../Texturas/tank_simples/efeitos/Municao_UP.png", imgWidth, imgHeight);
+
+    // Carregar shaders
     GLuint shaderProgram = setupShader();
 
     float lastTime = glfwGetTime();
@@ -122,14 +165,10 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Definir cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT);          // Limpar a tela com a cor definida
+        // Atualiza os tanques e munições
+        updateTank(tankA, window, deltaTime, true);
+        updateTank(tankB, window, deltaTime, false);
 
-        // Atualiza os tanques
-        updateTank(tankA, window, deltaTime);
-        updateTank(tankB, window, deltaTime);
-
-        // Atualiza as balas
         updateBullets(bulletsA, deltaTime);
         updateBullets(bulletsB, deltaTime);
 
@@ -137,17 +176,21 @@ int main()
         for (auto &bullet : bulletsA) {
             if (checkCollision(tankB, bullet)) {
                 tankB.isAlive = false;
+                triggerExplosion(tankB);
             }
         }
         for (auto &bullet : bulletsB) {
             if (checkCollision(tankA, bullet)) {
                 tankA.isAlive = false;
+                triggerExplosion(tankA);
             }
         }
 
         // Renderização dos sprites
         drawSprite(tankA, shaderProgram);
+        drawSprite(municaoA, shaderProgram);
         drawSprite(tankB, shaderProgram);
+        drawSprite(municaoB, shaderProgram);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -157,16 +200,7 @@ int main()
     return 0;
 }
 
-// Função de callback de teclado
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (action == GLFW_PRESS || action == GLFW_REPEAT)
-    {
-        if (key == GLFW_KEY_ESCAPE) // Fecha a janela se a tecla ESC for pressionada
-            glfwSetWindowShouldClose(window, true);
-    }
-}
-
+// Função para carregar texturas usando stb_image
 int loadTexture(string filePath, int &imgWidth, int &imgHeight)
 {
     GLuint textureID;
@@ -193,69 +227,11 @@ int loadTexture(string filePath, int &imgWidth, int &imgHeight)
         cout << "Erro ao carregar a textura: " << filePath << endl;
         return -1; // Retornar erro se a textura não for carregada
     }
-
     stbi_image_free(data);
     return textureID; // Retornar o ID da textura carregada
 }
 
-
-// Lógica para movimentação do tanque
-void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime)
-{
-    if (tank.isAlive)
-    {
-        // Controles do tanque do jogador
-        if (tank.texID == 0) { // Tanque A (jogador)
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-                tank.position.x -= tankSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                tank.position.x += tankSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-                tank.position.y += tankSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-                tank.position.y -= tankSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-                shootBullet(tank, bulletsA);
-        } 
-        else { // Tanque B (máquina)
-            // Movimento automático
-            tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1);
-            shootBullet(tank, bulletsB);
-        }
-    }
-}
-
-// Função para disparar uma bala
-void shootBullet(Sprite &tank, vector<Sprite> &bullets)
-{
-    if (!tank.isShooting)
-    {
-        Sprite bullet;
-        bullet.setupSprite(2, tank.position, vec3(0.05f, 0.05f, 1.0f));
-        bullets.push_back(bullet);
-        tank.isShooting = true;
-    }
-}
-
-// Atualiza as balas
-void updateBullets(vector<Sprite> &bullets, float deltaTime)
-{
-    for (auto &bullet : bullets)
-    {
-        bullet.position.y += bulletSpeed * deltaTime;
-    }
-}
-
-// Verifica se houve colisão entre o tanque e uma bala
-bool checkCollision(Sprite &tank, Sprite &bullet)
-{
-    return (tank.position.x < bullet.position.x + bullet.dimensions.x &&
-            tank.position.x + tank.dimensions.x > bullet.position.x &&
-            tank.position.y < bullet.position.y + bullet.dimensions.y &&
-            tank.position.y + tank.dimensions.y > bullet.position.y);
-}
-
-// Configuração dos shaders
+// Função para configurar shaders
 int setupShader()
 {
     // Compilação do Vertex Shader
@@ -312,13 +288,18 @@ int setupShader()
 // Função para desenhar um sprite
 void drawSprite(Sprite spr, GLuint shaderID)
 {
-	glUseProgram(shaderID);
+    glUseProgram(shaderID);
 
-	// Definir a matriz de projeção ortográfica no início do programa
-	mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
-	GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
-	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
+    // Certificar que o slot de textura correto está ativado
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, spr.texID); 
 
+    // Matriz de projeção ortográfica
+    mat4 projection = ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+    GLuint projectionLoc = glGetUniformLocation(shaderID, "projection");
+    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, value_ptr(projection));
+
+    // Matriz de transformação do modelo
     mat4 model = mat4(1.0f);
     model = translate(model, spr.position);
     model = rotate(model, radians(spr.angle), vec3(0.0f, 0.0f, 1.0f));
@@ -327,8 +308,87 @@ void drawSprite(Sprite spr, GLuint shaderID)
     GLuint modelLoc = glGetUniformLocation(shaderID, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, value_ptr(model));
 
-    glBindTexture(GL_TEXTURE_2D, spr.texID); // Vincular a textura do sprite
     glBindVertexArray(spr.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6); // Renderizar o sprite
     glBindVertexArray(0);
+}
+
+// Função para disparar uma bala
+void shootBullet(Sprite &tank, vector<Sprite> &bullets)
+{
+    if (!tank.isShooting)
+    {
+        Sprite bullet;
+        bullet.setupSprite(tank.texID, tank.position, vec3(0.05f, 0.1f, 1.0f)); // Tamanho da bala
+        bullets.push_back(bullet);
+        tank.isShooting = true;
+    }
+}
+
+// Atualiza as balas
+void updateBullets(vector<Sprite> &bullets, float deltaTime)
+{
+    for (auto &bullet : bullets)
+    {
+        bullet.position.y += bulletSpeed * deltaTime; // Movimentar as balas
+    }
+}
+
+// Verifica se houve colisão entre o tanque e uma bala
+bool checkCollision(Sprite &tank, Sprite &bullet)
+{
+    return (tank.position.x < bullet.position.x + bullet.dimensions.x &&
+            tank.position.x + tank.dimensions.x > bullet.position.x &&
+            tank.position.y < bullet.position.y + bullet.dimensions.y &&
+            tank.position.y + tank.dimensions.y > bullet.position.y);
+}
+
+// Função para acionar a explosão ao colidir
+void triggerExplosion(Sprite &tank)
+{
+    // Aqui será carregada a textura de explosão para o tanque atingido
+    int imgWidth, imgHeight;
+    tank.texID = loadTexture("../Texturas/tank_simples/efeitos/Explosion.png", imgWidth, imgHeight);
+}
+
+// Função de callback de teclado
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (action == GLFW_PRESS || action == GLFW_REPEAT)
+    {
+        if (key == GLFW_KEY_ESCAPE) // Fecha a janela se a tecla ESC for pressionada
+            glfwSetWindowShouldClose(window, true);
+    }
+}
+
+// Lógica para movimentação do tanque
+void updateTank(Sprite &tank, GLFWwindow *window, float deltaTime, bool isPlayer)
+{
+    if (tank.isAlive)
+    {
+        // Controles do tanque do jogador
+        if (isPlayer) {
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+                tank.position.x -= tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+                tank.position.x += tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && tank.position.y < 0.7f) // Limite superior do movimento
+                tank.position.y += tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && tank.position.y > -0.9f) // Limite inferior do movimento
+                tank.position.y -= tankSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+                shootBullet(tank, bulletsA); // Atirar
+        }
+        else {
+            // Movimento do tanque da IA
+            tank.position.x += tankSpeed * deltaTime * ((rand() % 2 == 0) ? -1 : 1); // Movimento lateral aleatório
+
+            if (tank.position.x > 0.9f) tank.position.x = 0.9f; // Limite direito
+            if (tank.position.x < -0.9f) tank.position.x = -0.9f; // Limite esquerdo
+
+            if (rand() % 100 < 5) { // Chance de disparar aleatoriamente
+                shootBullet(tank, bulletsB); // Disparar a munição da IA
+            }
+        }
+    }
 }
