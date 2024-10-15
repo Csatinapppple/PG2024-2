@@ -185,19 +185,19 @@ int main()
 
 	// for (int i=0; i< 1024; i++) keys[i] = false;
 
+	// Limpa o buffer de cor
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	// Loop da aplicação - "game loop"
 	while (!glfwWindowShouldClose(window))
 	{
 		// Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 		glfwPollEvents();
 
-		// Limpa o buffer de cor
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		drawSprite(background, shaderID);
 		vec2 offsetTex = vec2(0.0, 0.0);
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t);
-		drawSprite(background, shaderID);
 		if (keys[GLFW_KEY_SPACE] or character.st != Sprite::ON_FOOT ){
 			if(character.st == Sprite::ON_FOOT)
 				character.st = Sprite::JUMPING;
