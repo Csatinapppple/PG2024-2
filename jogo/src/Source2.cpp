@@ -43,6 +43,11 @@ struct Sprite
 	vec2 d;
 	float FPS;
 	float lastTime;
+	enum state {
+		JUMPING,
+		FALLING,
+		ON_FOOT
+	}st;
 
 	// Função de inicialização
 	void setupSprite(int texID, vec3 position, vec3 dimensions, int nFrames, int nAnimations);
@@ -67,10 +72,35 @@ const GLchar *vertexShaderSource = getVert.c_str();
 std::string getFrag = getFileContent("./src/shaders/fragmentShader.glsl");
 const GLchar *fragmentShaderSource = getFrag.c_str();
 
+const float floor_y = 200.0;
 float vel = 1.2;
 
-bool keys[1024] = {false};
+float vel_jmp = 10;
 
+bool keys[1024] = {false};
+const float jmp_limit = 400;
+//50 25 12.5 6.25 3.125 1
+void jump(Sprite* ch){
+	if(ch->st == Sprite::JUMPING) {
+		if(ch->position.y < jmp_limit)
+			ch->position.y += vel_jmp;
+		else
+			ch->st = Sprite::FALLING;
+		return;
+	}
+	else 
+	if(ch->st == Sprite::FALLING) {
+		if(ch->position.y > floor_y){
+			ch->position.y -= vel_jmp;
+		}
+		else{
+			ch->position.y = floor_y;
+			ch->st = Sprite::ON_FOOT;
+		}
+		return;
+	}	
+
+}
 // Função MAIN
 int main()
 {
@@ -126,11 +156,10 @@ int main()
 	int imgWidth, imgHeight;
 	int texID = loadTexture("../Texturas/backgrounds/PNG/Battleground3/Bright/Battleground3.png", imgWidth, imgHeight);
 	background.setupSprite(texID, vec3(400.0, 300.0, 0.0), vec3(imgWidth * 0.5, imgHeight * 0.5, 1.0), 1, 1);
-
 	// Inicializando a sprite do personagem
 	texID = loadTexture("../Texturas/characters/PNG/1 Pink_Monster/Pink_Monster_Walk_6.png", imgWidth, imgHeight);
-	character.setupSprite(texID, vec3(50.0, 200.0, 0.0), vec3(imgWidth / 6.0 * 2.0, imgHeight * 2.0, 1.0), 6, 1);
-
+	character.setupSprite(texID, vec3(50.0, floor_y, 0.0), vec3(imgWidth / 6.0 * 2.0, imgHeight * 2.0, 1.0), 6, 1);
+	character.st=Sprite::ON_FOOT;
 	glUseProgram(shaderID);
 
 	// Enviando a cor desejada (vec4) para o fragment shader
@@ -156,23 +185,24 @@ int main()
 
 	// for (int i=0; i< 1024; i++) keys[i] = false;
 
+	// Limpa o buffer de cor
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	// Loop da aplicação - "game loop"
 	while (!glfwWindowShouldClose(window))
 	{
 		// Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 		glfwPollEvents();
 
-		// Limpa o buffer de cor
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // cor de fundo
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		drawSprite(background, shaderID);
 		vec2 offsetTex = vec2(0.0, 0.0);
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t);
-		drawSprite(background, shaderID);
-		if (keys[GLFW_KEY_LEFT] || keys[GLFW_KEY_A])
-			character.position.x -= vel;
-		if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D])
-			character.position.x += vel;
+		if (keys[GLFW_KEY_SPACE] or character.st != Sprite::ON_FOOT ){
+			if(character.st == Sprite::ON_FOOT)
+				character.st = Sprite::JUMPING;
+			jump(&character);
+		}
 		// Incremento circular (em loop) do índice do frame
 
 		float now = glfwGetTime();
@@ -214,6 +244,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 		keys[key] = false;
 	}
 }
+
 
 // Esta função está basntante hardcoded - objetivo é compilar e "buildar" um programa de
 //  shader simples e único neste exemplo de código
