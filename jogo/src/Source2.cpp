@@ -43,7 +43,11 @@ struct Sprite
 	vec2 d;
 	float FPS;
 	float lastTime;
-	bool on_air;
+	enum state {
+		JUMPING,
+		FALLING,
+		ON_FOOT
+	}st;
 
 	// Função de inicialização
 	void setupSprite(int texID, vec3 position, vec3 dimensions, int nFrames, int nAnimations);
@@ -71,22 +75,28 @@ const GLchar *fragmentShaderSource = getFrag.c_str();
 const float floor_y = 200.0;
 float vel = 1.2;
 
-float vel_jmp = 0;
+float vel_jmp = 10;
 
 bool keys[1024] = {false};
+const float jmp_limit = 400;
 //50 25 12.5 6.25 3.125 1
 void jump(Sprite* ch){
-
-	if(ch->position.y == floor_y) {
-		vel_jmp = 100.;
-		ch->position.y += vel_jmp;
+	if(ch->st == Sprite::JUMPING) {
+		if(ch->position.y < jmp_limit)
+			ch->position.y += vel_jmp;
+		else
+			ch->st = Sprite::FALLING;
 		return;
 	}
-
-	if(ch->position.y != floor_y) {
-		vel_jmp /= 2.;
-		cout << ch->position.y << endl;
-		ch->position.y += vel_jmp;
+	else 
+	if(ch->st == Sprite::FALLING) {
+		if(ch->position.y > floor_y){
+			ch->position.y -= vel_jmp;
+		}
+		else{
+			ch->position.y = floor_y;
+			ch->st = Sprite::ON_FOOT;
+		}
 		return;
 	}	
 
@@ -149,7 +159,7 @@ int main()
 	// Inicializando a sprite do personagem
 	texID = loadTexture("../Texturas/characters/PNG/1 Pink_Monster/Pink_Monster_Walk_6.png", imgWidth, imgHeight);
 	character.setupSprite(texID, vec3(50.0, floor_y, 0.0), vec3(imgWidth / 6.0 * 2.0, imgHeight * 2.0, 1.0), 6, 1);
-	character.on_air=false;
+	character.st=Sprite::ON_FOOT;
 	glUseProgram(shaderID);
 
 	// Enviando a cor desejada (vec4) para o fragment shader
@@ -188,7 +198,9 @@ int main()
 		vec2 offsetTex = vec2(0.0, 0.0);
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t);
 		drawSprite(background, shaderID);
-		if (keys[GLFW_KEY_SPACE] or character.on_air ){
+		if (keys[GLFW_KEY_SPACE] or character.st != Sprite::ON_FOOT ){
+			if(character.st == Sprite::ON_FOOT)
+				character.st = Sprite::JUMPING;
 			jump(&character);
 		}
 		// Incremento circular (em loop) do índice do frame
