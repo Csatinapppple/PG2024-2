@@ -121,6 +121,8 @@ stickers = {
     'eyeglasses': cv2.imread('eyeglasses.png', cv2.IMREAD_UNCHANGED),
     'hat': cv2.imread('hat.png', cv2.IMREAD_UNCHANGED),
     'star': cv2.imread('star.png', cv2.IMREAD_UNCHANGED),
+    'elce': cv2.imread('elce.png', cv2.IMREAD_UNCHANGED),
+    'nascimento': cv2.imread('nascimento.png', cv2.IMREAD_UNCHANGED),
     # Adicione mais stickers conforme necessário
 }
 
