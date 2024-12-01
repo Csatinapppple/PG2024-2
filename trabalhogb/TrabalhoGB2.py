@@ -123,6 +123,7 @@ stickers = {
     'star': cv2.imread('star.png', cv2.IMREAD_UNCHANGED),
     'arvore': cv2.imread('arvore.png', cv2.IMREAD_UNCHANGED),
     'alce': cv2.imread('alce.png', cv2.IMREAD_UNCHANGED),
+    'nascimento': cv2.imread('nascimento.png', cv2.IMREAD_UNCHANGED),
     # Adicione mais stickers conforme necessário
 }
 
