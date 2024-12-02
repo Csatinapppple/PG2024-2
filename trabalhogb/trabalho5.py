@@ -2,197 +2,201 @@ import cv2  # Biblioteca para manipulação de imagens e vídeos
 import numpy as np  # Biblioteca para operações numéricas
 from tkinter import Tk, filedialog  # Interface gráfica para seleção de arquivos
 
-# Carregar stickers com transparência
-stickers = {
-    'eyeglasses': cv2.imread('eyeglasses.png', cv2.IMREAD_UNCHANGED),
-    'hat': cv2.imread('hat.png', cv2.IMREAD_UNCHANGED),
-    'star': cv2.imread('star.png', cv2.IMREAD_UNCHANGED),
+# Carregar adesivos (stickers) com transparência
+adesivos = {
+    'oculos': cv2.imread('eyeglasses.png', cv2.IMREAD_UNCHANGED),
+    'chapeu': cv2.imread('hat.png', cv2.IMREAD_UNCHANGED),
+    'estrela': cv2.imread('star.png', cv2.IMREAD_UNCHANGED),
     'arvore': cv2.imread('arvore.png', cv2.IMREAD_UNCHANGED),
     'alce': cv2.imread('alce.png', cv2.IMREAD_UNCHANGED),
     'nascimento': cv2.imread('nascimento.png', cv2.IMREAD_UNCHANGED),
 }
 
-# Verifica se todos os stickers foram carregados corretamente
-for name, sticker in stickers.items():
-    if sticker is None:
-        print(f"Erro ao carregar o sticker: {name}")
+# Verifica se todos os adesivos foram carregados corretamente
+for nome, adesivo in adesivos.items():
+    if adesivo is None:
+        print(f"Erro ao carregar o adesivo: {nome}")
         exit(1)
 
 # Variáveis globais
-current_sticker_idx = 0  # Índice do sticker atual
-current_filter_idx = 0  # Índice do filtro atual
-undo_stack = []  # Histórico de estados para desfazer ações
-original_image = None  # Imagem original carregada
-img_with_effects = None  # Imagem com efeitos aplicados
+indice_adesivo_atual = 0  # Índice do adesivo atual
+indice_filtro_atual = 0  # Índice do filtro atual
+historico_acao = []  # Histórico de estados para desfazer ações
+imagem_original = None  # Imagem original carregada
+imagem_com_efeitos = None  # Imagem com efeitos aplicados
 
 # Dimensões mínimas da janela
-MIN_WIDTH = 800
-MIN_HEIGHT = 600
+LARGURA_MINIMA = 800
+ALTURA_MINIMA = 600
+
+# Lista de nomes dos filtros
+nomes_filtros = ["Original", "Escala de Cinza", "Inversão", "Desfoque"]
 
 # Função para selecionar imagem
-def select_image():
+def selecionar_imagem():
     """Abre uma janela para o usuário selecionar uma imagem do computador."""
     Tk().withdraw()  # Oculta a janela principal do Tkinter
-    file_path = filedialog.askopenfilename(
+    caminho_arquivo = filedialog.askopenfilename(
         title="Selecione uma imagem",
         filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.tiff *.gif")]
     )
-    if not file_path:
+    if not caminho_arquivo:
         print("Nenhuma imagem selecionada. O programa será encerrado.")
         exit(1)
-    return file_path
+    return caminho_arquivo
 
 # Função para centralizar a imagem
-def center_image(img, min_width, min_height):
+def centralizar_imagem(imagem, largura_minima, altura_minima):
     """Centraliza a imagem em um fundo preto com dimensões mínimas de largura e altura."""
-    h, w, c = img.shape
-    new_h = max(h, min_height)
-    new_w = max(w, min_width)
+    altura, largura, canais = imagem.shape
+    nova_altura = max(altura, altura_minima)
+    nova_largura = max(largura, largura_minima)
 
     # Cria um fundo preto com as dimensões mínimas
-    centered_frame = np.zeros((new_h, new_w, c), dtype=np.uint8)
+    quadro_centralizado = np.zeros((nova_altura, nova_largura, canais), dtype=np.uint8)
 
     # Calcula as posições para centralizar a imagem
-    y_offset = (new_h - h) // 2
-    x_offset = (new_w - w) // 2
+    deslocamento_y = (nova_altura - altura) // 2
+    deslocamento_x = (nova_largura - largura) // 2
 
     # Coloca a imagem centralizada no fundo
-    centered_frame[y_offset:y_offset + h, x_offset:x_offset + w] = img
-    return centered_frame
+    quadro_centralizado[deslocamento_y:deslocamento_y + altura, deslocamento_x:deslocamento_x + largura] = imagem
+    return quadro_centralizado
 
-# Função para aplicar stickers
-def applySticker(background, sticker, x, y):
-    """Aplica um sticker na imagem em uma posição específica (x, y)."""
-    h, w = sticker.shape[:2]
-    b_h, b_w = background.shape[:2]
+# Função para aplicar adesivos
+def aplicar_adesivo(imagem_fundo, adesivo, posicao_x, posicao_y):
+    """Aplica um adesivo na imagem em uma posição específica (posicao_x, posicao_y)."""
+    altura_adesivo, largura_adesivo = adesivo.shape[:2]
+    altura_fundo, largura_fundo = imagem_fundo.shape[:2]
 
-    # Ajusta a posição caso o sticker ultrapasse os limites da imagem
-    if x + w > b_w or y + h > b_h:
-        print("Sticker ultrapassa os limites da imagem, ajustando posição...")
-        w = min(w, b_w - x)
-        h = min(h, b_h - y)
-        sticker = sticker[:h, :w]
+    # Ajusta a posição caso o adesivo ultrapasse os limites da imagem
+    if posicao_x + largura_adesivo > largura_fundo or posicao_y + altura_adesivo > altura_fundo:
+        largura_adesivo = min(largura_adesivo, largura_fundo - posicao_x)
+        altura_adesivo = min(altura_adesivo, altura_fundo - posicao_y)
+        adesivo = adesivo[:altura_adesivo, :largura_adesivo]
 
-    # Verifica se o sticker possui transparência
-    if sticker.shape[2] == 4:
-        b, g, r, a = cv2.split(sticker)
-        mask = a.astype(np.uint8)
-        sticker = cv2.merge((b, g, r))
+    # Verifica se o adesivo possui transparência
+    if adesivo.shape[2] == 4:
+        azul, verde, vermelho, alfa = cv2.split(adesivo)
+        mascara = alfa.astype(np.uint8)
+        adesivo = cv2.merge((azul, verde, vermelho))
     else:
-        mask = np.ones(sticker.shape[:2], dtype=np.uint8) * 255
+        mascara = np.ones(adesivo.shape[:2], dtype=np.uint8) * 255
 
-    # Combina o sticker com a região de interesse na imagem de fundo
-    roi = background[y:y+h, x:x+w]
-    bg_masked = cv2.bitwise_and(roi, roi, mask=cv2.bitwise_not(mask))
-    sticker_masked = cv2.bitwise_and(sticker, sticker, mask=mask)
-    background[y:y+h, x:x+w] = cv2.add(bg_masked, sticker_masked)
-    return background
+    # Combina o adesivo com a região de interesse na imagem de fundo
+    area_interesse = imagem_fundo[posicao_y:posicao_y + altura_adesivo, posicao_x:posicao_x + largura_adesivo]
+    fundo_mascarado = cv2.bitwise_and(area_interesse, area_interesse, mask=cv2.bitwise_not(mascara))
+    adesivo_mascarado = cv2.bitwise_and(adesivo, adesivo, mask=mascara)
+    imagem_fundo[posicao_y:posicao_y + altura_adesivo, posicao_x:posicao_x + largura_adesivo] = cv2.add(fundo_mascarado, adesivo_mascarado)
+    return imagem_fundo
 
 # Função para aplicar filtros
-def applyFilter(img, filter_idx):
+def aplicar_filtro(imagem, indice_filtro):
     """Aplica filtros predefinidos na imagem com base no índice do filtro."""
-    if filter_idx == 0:  # Retorna a imagem original
-        return img.copy()
-    elif filter_idx == 1:  # Filtro em escala de cinza
-        filtered = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        return cv2.cvtColor(filtered, cv2.COLOR_GRAY2BGR)  # Converte de volta para 3 canais
-    elif filter_idx == 2:  # Filtro de inversão
-        return cv2.bitwise_not(img)
-    elif filter_idx == 3:  # Filtro de desfoque
-        return cv2.GaussianBlur(img, (15, 15), 0)
-    return img
+    if indice_filtro == 0:  # Retorna a imagem original
+        return imagem.copy()
+    elif indice_filtro == 1:  # Filtro em escala de cinza
+        filtro = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        return cv2.cvtColor(filtro, cv2.COLOR_GRAY2BGR)  # Converte de volta para 3 canais
+    elif indice_filtro == 2:  # Filtro de inversão
+        return cv2.bitwise_not(imagem)
+    elif indice_filtro == 3:  # Filtro de desfoque
+        return cv2.GaussianBlur(imagem, (15, 15), 0)
+    return imagem
 
-# Função para desenhar o menu sobre a imagem
-def draw_menu(img):
-    """Desenha o menu de instruções diretamente sobre a imagem."""
-    instructions = [
+# Função para desenhar o menu e nome do filtro
+def desenhar_menu_e_filtro(imagem, nome_filtro):
+    """Desenha o menu e o nome do filtro diretamente sobre a imagem."""
+    instrucoes = [
         "Teclas de Atalho:",
         "'F' - Aplicar filtro",
-        "'C' - Alterar sticker (scroll do mouse)",
-        "Clique esquerdo - Adicionar sticker",
+        "'C' - Alterar adesivo (scroll do mouse)",
+        "Clique esquerdo - Adicionar adesivo",
         "'S' - Salvar imagem",
         "Ctrl + Z - Desfazer",
         "ESC - Sair"
     ]
 
     # Adiciona o menu no rodapé da imagem
-    h, w, _ = img.shape
-    overlay = img.copy()
-    cv2.rectangle(overlay, (0, h - 100), (w, h), (0, 0, 0), -1)  # Fundo preto semitransparente
+    altura, largura, _ = imagem.shape
+    sobreposicao = imagem.copy()
+    cv2.rectangle(sobreposicao, (0, altura - 100), (largura, altura), (0, 0, 0), -1)  # Fundo preto semitransparente
     alpha = 0.6
-    img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+    imagem = cv2.addWeighted(sobreposicao, alpha, imagem, 1 - alpha, 0)
 
     # Adiciona o texto das instruções
-    y0 = h - 80
-    dy = 20
-    for i, line in enumerate(instructions):
-        y = y0 + i * dy
-        cv2.putText(img, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+    posicao_y = altura - 80
+    deslocamento_y = 20
+    for linha in instrucoes:
+        cv2.putText(imagem, linha, (10, posicao_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        posicao_y += deslocamento_y
 
-    return img
+    # Adiciona o nome do filtro no topo
+    cv2.putText(imagem, f"Filtro: {nome_filtro}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+
+    return imagem
 
 # Callback para eventos do mouse
-def mouse_callback(event, x, y, flags, param):
-    """Callback para manipulação de eventos do mouse, como adicionar stickers."""
-    global img_with_effects, current_sticker_idx, undo_stack
-    if event == cv2.EVENT_LBUTTONDOWN:
-        undo_stack.append(img_with_effects.copy())
-        sticker = list(stickers.values())[current_sticker_idx]
-        img_with_effects = applySticker(img_with_effects, sticker, x, y)
-        img_with_menu = draw_menu(img_with_effects.copy())
-        cv2.imshow("Editor", img_with_menu)
-    elif event == cv2.EVENT_MOUSEWHEEL:
-        current_sticker_idx = (current_sticker_idx + (1 if flags > 0 else -1)) % len(stickers)
-        print(f"Sticker atual: {list(stickers.keys())[current_sticker_idx]}")
+def callback_mouse(evento, x, y, flags, parametros):
+    """Callback para manipulação de eventos do mouse, como adicionar adesivos."""
+    global imagem_com_efeitos, indice_adesivo_atual, historico_acao
+    if evento == cv2.EVENT_LBUTTONDOWN:
+        historico_acao.append(imagem_com_efeitos.copy())
+        adesivo = list(adesivos.values())[indice_adesivo_atual]
+        imagem_com_efeitos = aplicar_adesivo(imagem_com_efeitos, adesivo, x, y)
+        imagem_com_menu = desenhar_menu_e_filtro(imagem_com_efeitos.copy(), nomes_filtros[indice_filtro_atual])
+        cv2.imshow("Editor", imagem_com_menu)
+    elif evento == cv2.EVENT_MOUSEWHEEL:  # Scroll do mouse para trocar adesivos
+        indice_adesivo_atual = (indice_adesivo_atual + (1 if flags > 0 else -1)) % len(adesivos)
+        print(f"Adesivo atual: {list(adesivos.keys())[indice_adesivo_atual]}")
 
 # Função principal
 def main():
     """Função principal que controla o fluxo do programa."""
-    global img_with_effects, original_image, current_filter_idx, undo_stack
+    global imagem_com_efeitos, imagem_original, indice_filtro_atual, historico_acao
 
     # Seleciona a imagem
-    image_path = select_image()
-    original_image = cv2.imread(image_path)
-    if original_image is None:
+    caminho_imagem = selecionar_imagem()
+    imagem_original = cv2.imread(caminho_imagem)
+    if imagem_original is None:
         print("Erro ao carregar a imagem selecionada.")
         exit(1)
 
     # Centraliza a imagem se for menor que as dimensões mínimas
-    original_image = center_image(original_image, MIN_WIDTH, MIN_HEIGHT)
-    img_with_effects = original_image.copy()
-    undo_stack.append(img_with_effects.copy())  # Salva o estado inicial
+    imagem_original = centralizar_imagem(imagem_original, LARGURA_MINIMA, ALTURA_MINIMA)
+    imagem_com_efeitos = imagem_original.copy()
+    historico_acao.append(imagem_com_efeitos.copy())  # Salva o estado inicial
 
     # Adiciona o menu e exibe
-    img_with_menu = draw_menu(img_with_effects.copy())
-    cv2.imshow("Editor", img_with_menu)
-    cv2.setMouseCallback("Editor", mouse_callback)
+    imagem_com_menu = desenhar_menu_e_filtro(imagem_com_efeitos.copy(), nomes_filtros[indice_filtro_atual])
+    cv2.imshow("Editor", imagem_com_menu)
+    cv2.setMouseCallback("Editor", callback_mouse)
 
     while True:
-        key = cv2.waitKey(1) & 0xFF
-        if key == 27:  # ESC para sair
+        tecla = cv2.waitKey(1) & 0xFF
+        if tecla == 27:  # ESC para sair
             break
-        elif key == ord('s'):  # Salvar imagem
-            cv2.imwrite("imagem_editada.png", img_with_effects)
-            print("Imagem salva.")
-        elif key == ord('f'):  # Aplicar filtro
-            current_filter_idx = (current_filter_idx + 1) % 4
-            img_with_effects = applyFilter(original_image, current_filter_idx)
-            img_with_menu = draw_menu(img_with_effects.copy())
-            cv2.imshow("Editor", img_with_menu)
-        elif key == 26:  # Ctrl + Z (Desfazer)
-                if len(undo_stack) > 1:
-                    undo_stack.pop()
-                    img_with_effects = undo_stack[-1].copy()
-                    img_with_menu = draw_menu(img_with_effects.copy())
-                    cv2.imshow("Editor", img_with_menu)
-                    print("Desfeito.")
-                else:
-                    print("Nada para desfazer.")
-        elif key == ord('c'):  # Alterar o sticker atual usando o scroll do mouse
-                current_sticker_idx = (current_sticker_idx + 1) % len(stickers)
-                print(f"Sticker atual: {list(stickers.keys())[current_sticker_idx]}")
-                img_with_menu = draw_menu(img_with_effects.copy())
-                cv2.imshow("Editor", img_with_menu)
+        elif tecla == ord('s'):  # Salvar imagem
+            Tk().withdraw()
+            caminho_salvar = filedialog.asksaveasfilename(
+                title="Salvar imagem como",
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
+            )
+            if caminho_salvar:  # Salva apenas se o usuário selecionar um caminho
+                cv2.imwrite(caminho_salvar, imagem_com_efeitos)
+                print(f"Imagem salva em {caminho_salvar}")
+        elif tecla == ord('f'):  # Aplicar filtro
+            indice_filtro_atual = (indice_filtro_atual + 1) % len(nomes_filtros)
+            imagem_com_efeitos = aplicar_filtro(imagem_original, indice_filtro_atual)
+            imagem_com_menu = desenhar_menu_e_filtro(imagem_com_efeitos.copy(), nomes_filtros[indice_filtro_atual])
+            cv2.imshow("Editor", imagem_com_menu)
+        elif tecla == 26:  # Ctrl + Z (Desfazer)
+            if len(historico_acao) > 1:
+                historico_acao.pop()
+                imagem_com_efeitos = historico_acao[-1].copy()
+                imagem_com_menu = desenhar_menu_e_filtro(imagem_com_efeitos.copy(), nomes_filtros[indice_filtro_atual])
+                cv2.imshow("Editor", imagem_com_menu)
 
     cv2.destroyAllWindows()  # Fecha todas as janelas ao sair
 
