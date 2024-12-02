@@ -150,7 +150,7 @@ def aplicar_filtro(imagem, indice_filtro):
 def desenhar_menu_e_filtro(imagem, nome_filtro):
     """
     Exibe o menu de comandos e o nome do filtro atualmente aplicado sobre a imagem.
-    O menu é exibido em uma área semitransparente no rodapé da imagem.
+    O menu é exibido em uma área semitransparente na parte inferior da imagem.
     """
     instrucoes = [
         "Teclas de Atalho:",
@@ -162,19 +162,23 @@ def desenhar_menu_e_filtro(imagem, nome_filtro):
         "ESC - Sair"
     ]
 
-    # Adiciona o menu no rodapé da imagem
+    # Calcula a altura do menu com base no número de linhas de instruções
+    altura_linha = 20  # Altura de cada linha de texto
+    margem = 10  # Margem adicional
+    altura_menu = len(instrucoes) * altura_linha + margem * 2
+
+    # Adiciona um fundo para o menu
     altura, largura, _ = imagem.shape
     sobreposicao = imagem.copy()
-    cv2.rectangle(sobreposicao, (0, altura - 100), (largura, altura), (0, 0, 0), -1)  # Fundo preto semitransparente
+    cv2.rectangle(sobreposicao, (0, altura - altura_menu), (largura, altura), (0, 0, 0), -1)  # Fundo preto semitransparente
     alpha = 0.6
     imagem = cv2.addWeighted(sobreposicao, alpha, imagem, 1 - alpha, 0)
 
-    # Desenha as instruções do menu
-    posicao_y = altura - 80
-    deslocamento_y = 20
+    # Desenha as instruções no menu
+    posicao_y = altura - altura_menu + margem
     for linha in instrucoes:
         cv2.putText(imagem, linha, (10, posicao_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        posicao_y += deslocamento_y
+        posicao_y += altura_linha
 
     # Exibe o nome do filtro no topo da imagem
     cv2.putText(imagem, f"Filtro: {nome_filtro}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
