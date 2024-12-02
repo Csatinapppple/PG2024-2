@@ -22,6 +22,8 @@ for name, sticker in stickers.items():
 current_sticker_idx = 0  # Índice do sticker atual
 current_filter_idx = 0  # Índice do filtro atual
 undo_stack = []  # Histórico de estados para desfazer ações
+original_image = None  # Imagem original carregada
+img_with_effects = None  # Imagem com efeitos aplicados
 
 # Dimensões mínimas da janela
 MIN_WIDTH = 800
@@ -29,10 +31,7 @@ MIN_HEIGHT = 600
 
 # Função para selecionar imagem
 def select_image():
-    """
-    Abre uma janela para o usuário selecionar uma imagem do computador.
-    Retorna o caminho da imagem selecionada.
-    """
+    """Abre uma janela para o usuário selecionar uma imagem do computador."""
     Tk().withdraw()  # Oculta a janela principal do Tkinter
     file_path = filedialog.askopenfilename(
         title="Selecione uma imagem",
@@ -45,9 +44,7 @@ def select_image():
 
 # Função para centralizar a imagem
 def center_image(img, min_width, min_height):
-    """
-    Centraliza a imagem em um fundo preto com dimensões mínimas de largura e altura.
-    """
+    """Centraliza a imagem em um fundo preto com dimensões mínimas de largura e altura."""
     h, w, c = img.shape
     new_h = max(h, min_height)
     new_w = max(w, min_width)
@@ -65,9 +62,7 @@ def center_image(img, min_width, min_height):
 
 # Função para aplicar stickers
 def applySticker(background, sticker, x, y):
-    """
-    Aplica um sticker na imagem em uma posição específica (x, y).
-    """
+    """Aplica um sticker na imagem em uma posição específica (x, y)."""
     h, w = sticker.shape[:2]
     b_h, b_w = background.shape[:2]
 
@@ -95,10 +90,10 @@ def applySticker(background, sticker, x, y):
 
 # Função para aplicar filtros
 def applyFilter(img, filter_idx):
-    """
-    Aplica filtros predefinidos na imagem com base no índice do filtro.
-    """
-    if filter_idx == 1:  # Filtro em escala de cinza
+    """Aplica filtros predefinidos na imagem com base no índice do filtro."""
+    if filter_idx == 0:  # Retorna a imagem original
+        return img.copy()
+    elif filter_idx == 1:  # Filtro em escala de cinza
         filtered = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return cv2.cvtColor(filtered, cv2.COLOR_GRAY2BGR)  # Converte de volta para 3 canais
     elif filter_idx == 2:  # Filtro de inversão
@@ -107,11 +102,9 @@ def applyFilter(img, filter_idx):
         return cv2.GaussianBlur(img, (15, 15), 0)
     return img
 
-# Função para desenhar o menu abaixo da imagem
-def create_editor_frame(img):
-    """
-    Cria um frame com um menu de instruções abaixo da imagem.
-    """
+# Função para desenhar o menu sobre a imagem
+def draw_menu(img):
+    """Desenha o menu de instruções diretamente sobre a imagem."""
     instructions = [
         "Teclas de Atalho:",
         "'F' - Aplicar filtro",
@@ -122,32 +115,31 @@ def create_editor_frame(img):
         "ESC - Sair"
     ]
 
-    # Define a altura do menu
-    menu_height = 100
-    h, w, c = img.shape
-    frame = np.zeros((h + menu_height, w, c), dtype=np.uint8)
-    frame[:h, :] = img  # Adiciona a imagem no topo
+    # Adiciona o menu no rodapé da imagem
+    h, w, _ = img.shape
+    overlay = img.copy()
+    cv2.rectangle(overlay, (0, h - 100), (w, h), (0, 0, 0), -1)  # Fundo preto semitransparente
+    alpha = 0.6
+    img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
 
-    # Adiciona as instruções no menu
-    y0 = h + 20
+    # Adiciona o texto das instruções
+    y0 = h - 80
     dy = 20
     for i, line in enumerate(instructions):
         y = y0 + i * dy
-        cv2.putText(frame, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(img, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
-    return frame
+    return img
 
 # Callback para eventos do mouse
 def mouse_callback(event, x, y, flags, param):
-    """
-    Callback para manipulação de eventos do mouse, como adicionar stickers.
-    """
-    global img, current_sticker_idx, undo_stack
+    """Callback para manipulação de eventos do mouse, como adicionar stickers."""
+    global img_with_effects, current_sticker_idx, undo_stack
     if event == cv2.EVENT_LBUTTONDOWN:
-        undo_stack.append(img.copy())
+        undo_stack.append(img_with_effects.copy())
         sticker = list(stickers.values())[current_sticker_idx]
-        img = applySticker(img, sticker, x, y)
-        img_with_menu = create_editor_frame(img.copy())
+        img_with_effects = applySticker(img_with_effects, sticker, x, y)
+        img_with_menu = draw_menu(img_with_effects.copy())
         cv2.imshow("Editor", img_with_menu)
     elif event == cv2.EVENT_MOUSEWHEEL:
         current_sticker_idx = (current_sticker_idx + (1 if flags > 0 else -1)) % len(stickers)
@@ -155,24 +147,23 @@ def mouse_callback(event, x, y, flags, param):
 
 # Função principal
 def main():
-    """
-    Função principal que controla o fluxo do programa.
-    """
-    global img, current_filter_idx, undo_stack
+    """Função principal que controla o fluxo do programa."""
+    global img_with_effects, original_image, current_filter_idx, undo_stack
 
     # Seleciona a imagem
     image_path = select_image()
-    img = cv2.imread(image_path)
-    if img is None:
+    original_image = cv2.imread(image_path)
+    if original_image is None:
         print("Erro ao carregar a imagem selecionada.")
         exit(1)
 
     # Centraliza a imagem se for menor que as dimensões mínimas
-    img = center_image(img, MIN_WIDTH, MIN_HEIGHT)
-    undo_stack.append(img.copy())  # Salva o estado inicial
+    original_image = center_image(original_image, MIN_WIDTH, MIN_HEIGHT)
+    img_with_effects = original_image.copy()
+    undo_stack.append(img_with_effects.copy())  # Salva o estado inicial
 
     # Adiciona o menu e exibe
-    img_with_menu = create_editor_frame(img.copy())
+    img_with_menu = draw_menu(img_with_effects.copy())
     cv2.imshow("Editor", img_with_menu)
     cv2.setMouseCallback("Editor", mouse_callback)
 
@@ -181,22 +172,30 @@ def main():
         if key == 27:  # ESC para sair
             break
         elif key == ord('s'):  # Salvar imagem
-            cv2.imwrite("imagem_editada.png", img)
+            cv2.imwrite("imagem_editada.png", img_with_effects)
             print("Imagem salva.")
         elif key == ord('f'):  # Aplicar filtro
             current_filter_idx = (current_filter_idx + 1) % 4
-            filtered_img = applyFilter(img.copy(), current_filter_idx)
-            img_with_menu = create_editor_frame(filtered_img.copy())
+            img_with_effects = applyFilter(original_image, current_filter_idx)
+            img_with_menu = draw_menu(img_with_effects.copy())
             cv2.imshow("Editor", img_with_menu)
-        elif key == 26:  # Ctrl + Z
-            if len(undo_stack) > 1:
-                undo_stack.pop()
-                img = undo_stack[-1].copy()
-                img_with_menu = create_editor_frame(img.copy())
+        elif key == 26:  # Ctrl + Z (Desfazer)
+                if len(undo_stack) > 1:
+                    undo_stack.pop()
+                    img_with_effects = undo_stack[-1].copy()
+                    img_with_menu = draw_menu(img_with_effects.copy())
+                    cv2.imshow("Editor", img_with_menu)
+                    print("Desfeito.")
+                else:
+                    print("Nada para desfazer.")
+        elif key == ord('c'):  # Alterar o sticker atual usando o scroll do mouse
+                current_sticker_idx = (current_sticker_idx + 1) % len(stickers)
+                print(f"Sticker atual: {list(stickers.keys())[current_sticker_idx]}")
+                img_with_menu = draw_menu(img_with_effects.copy())
                 cv2.imshow("Editor", img_with_menu)
-                print("Desfeito.")
 
-    cv2.destroyAllWindows()
+    cv2.destroyAllWindows()  # Fecha todas as janelas ao sair
+
 
 if __name__ == "__main__":
     main()
