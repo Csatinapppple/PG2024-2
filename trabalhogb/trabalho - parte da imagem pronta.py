@@ -32,7 +32,11 @@ LARGURA_MINIMA = 800
 ALTURA_MINIMA = 600
 
 # Lista de nomes dos filtros para exibição
-nomes_filtros = ["Original", "Escala de Cinza", "Inversão", "Desfoque"]
+nomes_filtros = [
+    "Original", "Escala de Cinza", "Inversão", "Desfoque", "Clarendon",
+    "Efeito Tumblr", "Efeito Prism", "Pretty Freckles", "Vintage",
+    "Silly Face", "Kyle+Kendall Slim", "Filtro P&B", "Filtro Kodak"
+]
 
 # Função para selecionar uma imagem
 def selecionar_imagem():
@@ -105,18 +109,42 @@ def aplicar_adesivo(imagem_fundo, adesivo, posicao_x, posicao_y):
 def aplicar_filtro(imagem, indice_filtro):
     """
     Aplica um dos filtros predefinidos à imagem com base no índice selecionado.
-    Filtros disponíveis: Original, Escala de Cinza, Inversão e Desfoque.
+    Filtros disponíveis incluem filtros originais e personalizados.
     """
     if indice_filtro == 0:  # Imagem original sem alterações
         return imagem.copy()
-    elif indice_filtro == 1:  # Filtro de escala de cinza
+    elif indice_filtro == 1:  # Escala de Cinza
         filtro = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
-        return cv2.cvtColor(filtro, cv2.COLOR_GRAY2BGR)  # Converte para 3 canais
-    elif indice_filtro == 2:  # Filtro de inversão de cores
+        return cv2.cvtColor(filtro, cv2.COLOR_GRAY2BGR)
+    elif indice_filtro == 2:  # Inversão
         return cv2.bitwise_not(imagem)
-    elif indice_filtro == 3:  # Filtro de desfoque
+    elif indice_filtro == 3:  # Desfoque
         return cv2.GaussianBlur(imagem, (15, 15), 0)
-    return imagem
+    elif indice_filtro == 4:  # Clarendon
+        return cv2.addWeighted(imagem, 1.2, cv2.GaussianBlur(imagem, (15, 15), 0), -0.2, 0)
+    elif indice_filtro == 5:  # Efeito Tumblr
+        return cv2.applyColorMap(imagem, cv2.COLORMAP_PINK)
+    elif indice_filtro == 6:  # Prism
+        return cv2.applyColorMap(imagem, cv2.COLORMAP_RAINBOW)
+    elif indice_filtro == 7:  # Pretty Freckles
+        return cv2.cvtColor(cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV), cv2.COLOR_HSV2BGR)
+    elif indice_filtro == 8:  # Vintage
+        sepia_filter = np.array([[0.272, 0.534, 0.131],
+                                 [0.349, 0.686, 0.168],
+                                 [0.393, 0.769, 0.189]])
+        imagem_vintage = cv2.transform(imagem, sepia_filter)
+        return np.clip(imagem_vintage, 0, 255).astype(np.uint8)  # Usando np.clip
+    elif indice_filtro == 9:  # Silly Face
+        return cv2.add(imagem, np.full_like(imagem, 30))
+    elif indice_filtro == 10:  # Kyle+Kendall Slim
+        return cv2.bilateralFilter(imagem, 15, 80, 80)
+    elif indice_filtro == 11:  # Filtro P&B
+        pb_filter = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        return cv2.merge([pb_filter, pb_filter, pb_filter])
+    elif indice_filtro == 12:  # Filtro Kodak
+        lookup_table = np.array([min(i + 20, 255) for i in range(256)]).astype("uint8")
+        return cv2.LUT(imagem, lookup_table)
+    return imagem  # Retorna a imagem sem alterações se nenhum filtro corresponder
 
 # Função para desenhar o menu e o nome do filtro
 def desenhar_menu_e_filtro(imagem, nome_filtro):
