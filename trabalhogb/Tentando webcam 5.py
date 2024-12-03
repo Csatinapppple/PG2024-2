@@ -149,10 +149,13 @@ def salvar_imagem(imagem):
 
 def iniciar_video_writer(frame):
     """
-    Inicializa o gravador de vídeo com as dimensões do frame.
+    Inicializa o gravador de vídeo no formato MP4 com codec H264.
+    O codec H264 é amplamente suportado e embutido no formato MP4.
     """
     global video_writer, video_filename
+
     if video_writer is None:
+        # Abre uma janela de diálogo para salvar o vídeo
         Tk().withdraw()
         video_filename = filedialog.asksaveasfilename(
             title="Salvar vídeo como",
@@ -160,18 +163,23 @@ def iniciar_video_writer(frame):
             filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")]
         )
         if video_filename:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # Define o codec H264 (adequado para arquivos MP4)
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            # Inicializa o VideoWriter com 30 FPS e as dimensões do frame
             video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
+            print(f"Gravando vídeo em: {video_filename}")
 
 def finalizar_video_writer():
     """
     Finaliza e salva o vídeo gravado.
+    Certifica-se de que o arquivo seja gravado corretamente.
     """
     global video_writer, video_filename
+
     if video_writer is not None:
         video_writer.release()
         video_writer = None
-        print(f"Vídeo salvo como {video_filename}")
+        print(f"Vídeo salvo em: {video_filename}")
 
 def desfazer_acao():
     """
@@ -197,26 +205,36 @@ def gerar_miniaturas(imagem):
 
 def atualizar_janela():
     """
-    Atualiza a janela principal com a imagem ou frame da webcam.
+    Atualiza a janela principal e escreve o frame processado no vídeo se necessário.
     """
-    global imagem_com_efeitos
+    global imagem_com_efeitos, usando_webcam
+
     if imagem_com_efeitos is None:
         return
 
+    if usando_webcam and video_writer is not None:
+        # Grava o frame atual no arquivo de vídeo
+        video_writer.write(imagem_com_efeitos)
+
+    # Redimensiona a imagem para exibição
     visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
     largura_total = LARGURA_JANELA
     altura_total = ALTURA_JANELA
 
+    # Cria uma janela vazia para montagem
     janela = np.zeros((altura_total, largura_total, 3), dtype=np.uint8)
 
+    # Calcula offsets para centralizar o frame na janela
     x_offset_frame = (largura_total - visualizacao.shape[1]) // 2
     y_offset_frame = ALTURA_ADESIVOS
 
+    # Monta a janela com as áreas de adesivos, frame e barra de filtros
     janela[:ALTURA_ADESIVOS] = desenhar_area_adesivos(largura_total)
     janela[y_offset_frame:y_offset_frame + visualizacao.shape[0], x_offset_frame:x_offset_frame + visualizacao.shape[1]] = visualizacao
     janela[y_offset_frame + visualizacao.shape[0]:y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA] = desenhar_barra_de_filtros(largura_total)
     desenhar_botoes(janela, largura_total, y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA)
 
+    # Exibe a janela montada
     cv2.imshow("Editor", janela)
 
 def desenhar_area_adesivos(largura):
