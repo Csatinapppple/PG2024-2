@@ -162,6 +162,7 @@ def iniciar_video_writer(frame):
         if video_filename:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
+
 def finalizar_video_writer():
     """
     Finaliza e salva o vídeo gravado.
@@ -186,13 +187,13 @@ def gerar_miniaturas(imagem):
     """
     Gera miniaturas dos filtros disponíveis para exibição na barra.
     """
+    global miniaturas
     miniaturas = []
     for i in range(len(nomes_filtros)):
         filtro_aplicado = aplicar_filtro(imagem, i)
         largura_miniatura = LARGURA_JANELA // len(nomes_filtros)
         miniatura = cv2.resize(filtro_aplicado, (largura_miniatura, 80))
         miniaturas.append(miniatura)
-    return miniaturas
 
 def atualizar_janela():
     """
@@ -236,6 +237,7 @@ def desenhar_barra_de_filtros(largura):
     """
     Desenha a barra horizontal com miniaturas dos filtros.
     """
+    global miniaturas
     barra = np.zeros((ALTURA_BARRA, largura, 3), dtype=np.uint8)
     largura_miniatura = largura // len(nomes_filtros)
     x_offset = 0
@@ -264,7 +266,6 @@ def desenhar_botoes(janela, largura, y_offset):
 
     cv2.rectangle(janela, (x_desfazer, y_offset), (x_desfazer + botao_largura, y_offset + botao_altura), (200, 200, 200), -1)
     cv2.putText(janela, "Desfazer", (x_desfazer + 35, y_offset + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-
 def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
@@ -335,7 +336,7 @@ def carregar_imagem_e_iniciar():
 
     imagem_com_efeitos = imagem_original.copy()
     historico_acao = [imagem_com_efeitos.copy()]
-    miniaturas = gerar_miniaturas(imagem_original)
+    gerar_miniaturas(imagem_original)
 
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
@@ -351,7 +352,7 @@ def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, video_writer, imagem_com_efeitos, miniaturas
+    global usando_webcam, imagem_com_efeitos, miniaturas
 
     usando_webcam = True
     captura = cv2.VideoCapture(0)
@@ -362,13 +363,16 @@ def inicializar_webcam():
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
 
+    ret, frame = captura.read()
+    if ret:
+        gerar_miniaturas(frame)
+
     while True:
         ret, frame = captura.read()
         if not ret:
             break
 
         imagem_com_efeitos = aplicar_filtro(frame, indice_filtro_atual)
-
         atualizar_janela()
 
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
