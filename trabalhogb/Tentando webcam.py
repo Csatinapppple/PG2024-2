@@ -72,6 +72,8 @@ def redimensionar_para_visualizacao(imagem):
     Redimensiona a imagem para caber no quadro de edição, mantendo a proporção.
     """
     global escala_visualizacao
+    if imagem is None:
+        return None
     altura, largura = imagem.shape[:2]
     escala_visualizacao = min(LARGURA_FRAME / largura, ALTURA_FRAME / altura)
     nova_largura = int(largura * escala_visualizacao)
@@ -104,6 +106,8 @@ def aplicar_filtro(imagem, indice_filtro):
     """
     Aplica um dos filtros predefinidos com base no índice selecionado.
     """
+    if imagem is None:
+        return None
     if indice_filtro == 0:  # Original
         return imagem.copy()
     elif indice_filtro == 1:  # Escala de Cinza
@@ -331,9 +335,9 @@ def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, video_writer
-    usando_webcam = True
+    global usando_webcam, video_writer, imagem_com_efeitos, historico_acao
 
+    usando_webcam = True
     captura = cv2.VideoCapture(0)
     if not captura.isOpened():
         print("Erro ao acessar a webcam.")
@@ -347,10 +351,14 @@ def inicializar_webcam():
         if not ret:
             break
 
+        # Aplica filtro no frame atual
         frame_com_efeito = aplicar_filtro(frame, indice_filtro_atual)
+
+        # Salva frame no vídeo
         salvar_frame_webcam(frame_com_efeito)
 
-        imagem_com_efeitos = frame_com_efeito
+        # Adiciona adesivos, se selecionado
+        imagem_com_efeitos = frame_com_efeito.copy()
         atualizar_janela()
 
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
