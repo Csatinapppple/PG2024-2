@@ -56,7 +56,7 @@ nomes_filtros = [
     "Silly Face",           # Filtro 7: Aumenta o brilho da imagem.
     "Kyle+Kendall Slim",    # Filtro 8: Aplica suavização à imagem.
     "Filtro Kodak",         # Filtro 9: Simula cores mais quentes, estilo filme Kodak.
-    "Negativo da Foto"      # Filtro 10: Converte para negativo.
+    "Efeito Preto e Vermelho"  # Filtro 10: Cria um efeito preto e vermelho.
 ]
 
 # ---------------------------------------
@@ -194,9 +194,14 @@ def aplicar_filtro_generico(imagem_base, indice_filtro):
         # Aplica a tabela de look-up à imagem, ajustando os valores.
         return cv2.LUT(imagem_base, lookup_table)
 
-    elif indice_filtro == 10:  # Negativo da Foto: Inverte as cores da imagem.
-        # Usa a mesma técnica de inversão do filtro 2.
-        return cv2.bitwise_not(imagem_base)
+    elif indice_filtro == 10:  # Efeito Preto e Vermelho.
+        # Converte a imagem para escala de cinza.
+        gray = cv2.cvtColor(imagem_base, cv2.COLOR_BGR2GRAY)
+        # Cria uma imagem em vermelho com base na escala de cinza.
+        red_channel = np.zeros_like(gray)
+        # Combina os canais para criar o efeito preto e vermelho.
+        preto_vermelho = cv2.merge((red_channel, red_channel, gray))
+        return preto_vermelho
 
     # Caso o índice não corresponda a nenhum filtro, retorna a imagem original.
     return imagem_base
