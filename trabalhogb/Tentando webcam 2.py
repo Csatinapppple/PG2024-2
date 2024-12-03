@@ -138,6 +138,20 @@ def aplicar_filtro(imagem, indice_filtro):
         return cv2.bitwise_not(imagem)
     return imagem
 
+def salvar_imagem(imagem):
+    """
+    Salva a imagem atual na pasta que o usuário desejar.
+    """
+    Tk().withdraw()
+    caminho_salvar = filedialog.asksaveasfilename(
+        title="Salvar imagem como",
+        defaultextension=".png",
+        filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
+    )
+    if caminho_salvar:
+        cv2.imwrite(caminho_salvar, imagem)
+        print(f"Imagem salva em {caminho_salvar}")
+
 def salvar_video():
     """
     Solicita ao usuário um local para salvar o vídeo e inicializa o gravador.
@@ -152,7 +166,6 @@ def salvar_video():
     if video_filename:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (LARGURA_FRAME, ALTURA_FRAME))
-
 def desfazer_acao():
     """
     Desfaz a última ação do usuário, caso possível.
