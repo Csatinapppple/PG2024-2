@@ -182,8 +182,6 @@ def salvar_frame_webcam(frame):
     Salva um frame capturado da webcam no arquivo de vídeo.
     """
     global video_writer
-    if video_writer is None:
-        iniciar_video_writer(frame)  # Inicializa o gravador, se necessário
     if video_writer is not None:
         video_writer.write(frame)  # Escreve o frame no arquivo de vídeo
 
@@ -191,7 +189,6 @@ def salvar_frame_webcam(frame):
 def finalizar_video_writer():
     """
     Finaliza e salva o vídeo gravado.
-    Mostra uma mensagem de progresso durante o salvamento.
     """
     global video_writer, video_filename
 
@@ -311,7 +308,8 @@ def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
     """
-    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual
+    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual, video_writer, usando_webcam
+
     if imagem_com_efeitos is None:
         return
 
@@ -332,6 +330,8 @@ def callback_mouse(evento, x, y, flags, parametros):
             adesivo = list(adesivos.values())[indice_adesivo_atual]
             historico_acao.append(imagem_com_efeitos.copy())
             aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
+            if usando_webcam and video_writer is None:
+                iniciar_video_writer(imagem_com_efeitos)  # Inicia o vídeo se não iniciado
             atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura < y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA:
@@ -340,6 +340,8 @@ def callback_mouse(evento, x, y, flags, parametros):
                 indice_filtro_atual = indice_filtro
                 imagem_com_efeitos = aplicar_filtro(imagem_com_efeitos, indice_filtro_atual)
                 historico_acao.append(imagem_com_efeitos.copy())
+                if usando_webcam and video_writer is None:
+                    iniciar_video_writer(imagem_com_efeitos)  # Inicia o vídeo se não iniciado
                 atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
@@ -350,8 +352,7 @@ def callback_mouse(evento, x, y, flags, parametros):
 
             if x_salvar <= x <= x_salvar + largura_botoes:
                 if usando_webcam:
-                    iniciar_video_writer(imagem_com_efeitos)
-                    finalizar_video_writer()
+                    finalizar_video_writer()  # Finaliza o vídeo antes de salvar
                 else:
                     salvar_imagem(imagem_com_efeitos)
             elif x_desfazer <= x <= x_desfazer + largura_botoes:
@@ -394,7 +395,7 @@ def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, imagem_com_efeitos, miniaturas
+    global usando_webcam, video_writer, imagem_com_efeitos, historico_acao
 
     usando_webcam = True
     captura = cv2.VideoCapture(0)
@@ -405,23 +406,27 @@ def inicializar_webcam():
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
 
-    ret, frame = captura.read()
-    if ret:
-        gerar_miniaturas(frame)
-
     while True:
         ret, frame = captura.read()
         if not ret:
             break
 
-        imagem_com_efeitos = aplicar_filtro(frame, indice_filtro_atual)
+        # Aplica filtro no frame atual
+        frame_com_efeito = aplicar_filtro(frame, indice_filtro_atual)
+
+        # Salva frame no vídeo
+        salvar_frame_webcam(frame_com_efeito)
+
+        # Adiciona adesivos, se selecionado
+        imagem_com_efeitos = frame_com_efeito.copy()
         atualizar_janela()
 
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
             break
 
     captura.release()
-    finalizar_video_writer()
+    if video_writer:
+        finalizar_video_writer()  # Garante finalização do vídeo
     cv2.destroyAllWindows()
 
 def escolher_modo():
