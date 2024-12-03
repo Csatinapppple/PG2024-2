@@ -32,7 +32,7 @@ escala_visualizacao = None # Escala da imagem para ajustar ao quadro de edição
 miniaturas = []           # Miniaturas de filtros disponíveis para exibição
 usando_webcam = False     # Indica se o programa está usando a webcam
 video_writer = None       # Gravador de vídeo para salvar frames da webcam
-video_filename = "output.mp4"  # Nome do arquivo de vídeo para salvar
+video_filename = None     # Nome do arquivo de vídeo para salvar
 
 # Dimensões do quadro de edição e elementos da interface
 LARGURA_JANELA = 1366
@@ -152,17 +152,20 @@ def salvar_imagem(imagem):
         cv2.imwrite(caminho_salvar, imagem)
         print(f"Imagem salva em {caminho_salvar}")
 
-def salvar_frame_webcam(frame):
+def salvar_video():
     """
-    Salva um frame capturado da webcam no arquivo de vídeo.
+    Solicita ao usuário um local para salvar o vídeo e inicializa o gravador.
     """
     global video_writer, video_filename
-    if video_writer is None:
-        # Configuração do codec e do gravador de vídeo
+    Tk().withdraw()
+    video_filename = filedialog.asksaveasfilename(
+        title="Salvar vídeo como",
+        defaultextension=".mp4",
+        filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")]
+    )
+    if video_filename:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
-    video_writer.write(frame)
-
+        video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (LARGURA_FRAME, ALTURA_FRAME))
 def desfazer_acao():
     """
     Desfaz a última ação do usuário, caso possível.
@@ -231,8 +234,9 @@ def desenhar_barra_de_filtros(largura):
     largura_miniatura = largura // len(nomes_filtros)
     x_offset = 0
     for i, miniatura in enumerate(miniaturas):
-        miniatura_redimensionada = cv2.resize(miniatura, (largura_miniatura, 80))
-        barra[10:90, x_offset:x_offset + largura_miniatura] = miniatura_redimensionada
+        if miniatura is not None:
+            miniatura_redimensionada = cv2.resize(miniatura, (largura_miniatura, 80))
+            barra[10:90, x_offset:x_offset + largura_miniatura] = miniatura_redimensionada
         if i == indice_filtro_atual:
             cv2.rectangle(barra, (x_offset, 10), (x_offset + largura_miniatura, 90), (0, 255, 0), 2)
         x_offset += largura_miniatura
@@ -335,13 +339,15 @@ def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, video_writer, imagem_com_efeitos, historico_acao
+    global usando_webcam, video_writer, imagem_com_efeitos, historico_acao, miniaturas
 
     usando_webcam = True
     captura = cv2.VideoCapture(0)
     if not captura.isOpened():
         print("Erro ao acessar a webcam.")
         return
+
+    salvar_video()  # Solicita ao usuário onde salvar o vídeo
 
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
@@ -351,14 +357,13 @@ def inicializar_webcam():
         if not ret:
             break
 
-        # Aplica filtro no frame atual
-        frame_com_efeito = aplicar_filtro(frame, indice_filtro_atual)
+        imagem_com_efeitos = aplicar_filtro(frame, indice_filtro_atual)
+        if video_writer:
+            video_writer.write(imagem_com_efeitos)
 
-        # Salva frame no vídeo
-        salvar_frame_webcam(frame_com_efeito)
+        if miniaturas == []:  # Gera miniaturas da webcam se não existirem
+            miniaturas = gerar_miniaturas(frame)
 
-        # Adiciona adesivos, se selecionado
-        imagem_com_efeitos = frame_com_efeito.copy()
         atualizar_janela()
 
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
