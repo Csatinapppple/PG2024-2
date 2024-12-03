@@ -39,7 +39,7 @@ ALTURA_BARRA = 100        # Altura da barra de filtros
 ALTURA_ADESIVOS = 100     # Altura da área de adesivos
 ALTURA_BOTOES = 50        # Altura dos botões "Salvar" e "Desfazer"
 
-# Nomes dos filtros disponíveis (removido o "Clarendon")
+# Nomes dos filtros disponíveis (filtros removidos: "Pretty Freckles" e "Filtro P&B")
 nomes_filtros = [
     "Original",             # Filtro 0
     "Escala de Cinza",      # Filtro 1
@@ -47,12 +47,10 @@ nomes_filtros = [
     "Desfoque",             # Filtro 3
     "Efeito Tumblr",        # Filtro 4
     "Efeito Prism",         # Filtro 5
-    "Pretty Freckles",      # Filtro 6
-    "Vintage",              # Filtro 7
-    "Silly Face",           # Filtro 8
-    "Kyle+Kendall Slim",    # Filtro 9
-    "Filtro P&B",           # Filtro 10
-    "Filtro Kodak"          # Filtro 11
+    "Vintage",              # Filtro 6
+    "Silly Face",           # Filtro 7
+    "Kyle+Kendall Slim",    # Filtro 8
+    "Filtro Kodak"          # Filtro 9
 ]
 
 # ---------------------------------------
@@ -113,22 +111,17 @@ def aplicar_filtro(imagem, indice_filtro):
         return cv2.applyColorMap(imagem, cv2.COLORMAP_PINK)
     elif indice_filtro == 5:  # Efeito Prism
         return cv2.applyColorMap(imagem, cv2.COLORMAP_RAINBOW)
-    elif indice_filtro == 6:  # Pretty Freckles
-        return cv2.cvtColor(cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV), cv2.COLOR_HSV2BGR)
-    elif indice_filtro == 7:  # Vintage
+    elif indice_filtro == 6:  # Vintage
         sepia_filter = np.array([[0.272, 0.534, 0.131],
                                  [0.349, 0.686, 0.168],
                                  [0.393, 0.769, 0.189]])
         imagem_vintage = cv2.transform(imagem, sepia_filter)
         return np.clip(imagem_vintage, 0, 255).astype(np.uint8)
-    elif indice_filtro == 8:  # Silly Face
+    elif indice_filtro == 7:  # Silly Face
         return cv2.add(imagem, np.full_like(imagem, 30))
-    elif indice_filtro == 9:  # Kyle+Kendall Slim
+    elif indice_filtro == 8:  # Kyle+Kendall Slim
         return cv2.bilateralFilter(imagem, 15, 80, 80)
-    elif indice_filtro == 10:  # Filtro P&B
-        pb_filter = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
-        return cv2.merge([pb_filter, pb_filter, pb_filter])
-    elif indice_filtro == 11:  # Filtro Kodak
+    elif indice_filtro == 9:  # Filtro Kodak
         lookup_table = np.array([min(i + 20, 255) for i in range(256)]).astype("uint8")
         return cv2.LUT(imagem, lookup_table)
     return imagem
@@ -165,6 +158,8 @@ def atualizar_janela():
     janela[ALTURA_ADESIVOS + visualizacao.shape[0]:] = desenhar_barra_de_filtros(largura_total)
 
     cv2.imshow("Editor", janela)
+
+
 def desenhar_area_adesivos(largura):
     """
     Desenha a área horizontal com miniaturas de adesivos.
