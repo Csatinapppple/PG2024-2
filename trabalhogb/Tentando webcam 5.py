@@ -149,8 +149,8 @@ def salvar_imagem(imagem):
 
 def iniciar_video_writer(frame):
     """
-    Inicializa o gravador de vídeo no formato MP4 com codec H264.
-    O codec H264 é amplamente suportado e embutido no formato MP4.
+    Inicializa o gravador de vídeo no formato MP4 com codec H.264.
+    O codec H.264 é amplamente suportado e embutido no formato MP4.
     """
     global video_writer, video_filename
 
@@ -163,11 +163,14 @@ def iniciar_video_writer(frame):
             filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")]
         )
         if video_filename:
-            # Define o codec H264 (adequado para arquivos MP4)
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            # Define o codec H.264 usando "avc1" ou "H264"
+            fourcc = cv2.VideoWriter_fourcc(*'H264')
             # Inicializa o VideoWriter com 30 FPS e as dimensões do frame
             video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
-            print(f"Gravando vídeo em: {video_filename}")
+            if not video_writer.isOpened():
+                print(f"Erro ao inicializar o VideoWriter. Certifique-se de que o codec H.264 está instalado corretamente.")
+            else:
+                print(f"Gravando vídeo em: {video_filename}")
 
 def finalizar_video_writer():
     """
