@@ -98,6 +98,29 @@ def aplicar_adesivo(imagem_fundo, adesivo, x, y):
     sobreposicao = cv2.add(fundo, adesivo_rgb)
     imagem_fundo[y:y + altura_adesivo, x:x + largura_adesivo] = sobreposicao
 
+def aplicar_adesivo_webcam(imagem_fundo, adesivo, x, y):
+    """
+    Aplica um adesivo na imagem de fundo usada na webcam e mantém os adesivos persistentes.
+    """
+    global imagem_com_adesivos
+    altura_adesivo, largura_adesivo = adesivo.shape[:2]
+
+    if adesivo.shape[2] == 4:  # Verifica canal alfa
+        azul, verde, vermelho, alfa = cv2.split(adesivo)
+        adesivo_rgb = cv2.merge((azul, verde, vermelho))
+        mascara = alfa
+    else:
+        adesivo_rgb = adesivo
+        mascara = np.ones((altura_adesivo, largura_adesivo), dtype=np.uint8) * 255
+
+    if y + altura_adesivo > imagem_fundo.shape[0] or x + largura_adesivo > imagem_fundo.shape[1]:
+        return
+    roi = imagem_com_adesivos[y:y + altura_adesivo, x:x + largura_adesivo]
+    fundo = cv2.bitwise_and(roi, roi, mask=cv2.bitwise_not(mascara))
+    sobreposicao = cv2.add(fundo, adesivo_rgb)
+    imagem_com_adesivos[y:y + altura_adesivo, x:x + largura_adesivo] = sobreposicao
+
+
 def aplicar_filtro_generico(imagem_base, indice_filtro):
     """
     Aplica um dos filtros predefinidos na imagem base fornecida.
@@ -299,7 +322,7 @@ def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
     """
-    global imagem_com_efeitos, imagem_original, historico_acao, indice_adesivo_atual, indice_filtro_atual, gravando_video
+    global imagem_com_efeitos, imagem_original, imagem_com_adesivos, historico_acao, indice_adesivo_atual, indice_filtro_atual, gravando_video
 
     if evento == cv2.EVENT_LBUTTONDOWN:
         visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
@@ -318,10 +341,13 @@ def callback_mouse(evento, x, y, flags, parametros):
             x_original = int((x - x_offset_frame) / escala_visualizacao)
             y_original = int((y - y_offset_frame) / escala_visualizacao)
             adesivo = list(adesivos.values())[indice_adesivo_atual]
-            historico_acao.append(imagem_com_efeitos.copy())
-            aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
-            if usando_webcam and not gravando_video:
-                iniciar_video_writer(imagem_com_efeitos)
+            if usando_webcam:
+                aplicar_adesivo_webcam(imagem_com_efeitos, adesivo, x_original, y_original)
+                if not gravando_video:  # Inicia a gravação se ainda não estiver gravando
+                    iniciar_video_writer(imagem_com_efeitos)
+            else:
+                historico_acao.append(imagem_com_efeitos.copy())
+                aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
             atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura < y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA:
@@ -330,11 +356,11 @@ def callback_mouse(evento, x, y, flags, parametros):
                 indice_filtro_atual = indice_filtro
                 if usando_webcam:
                     imagem_com_efeitos = aplicar_filtro_generico(imagem_com_efeitos, indice_filtro_atual)
+                    if not gravando_video:  # Inicia a gravação se ainda não estiver gravando
+                        iniciar_video_writer(imagem_com_efeitos)
                 else:
                     imagem_com_efeitos = aplicar_filtro_generico(imagem_original, indice_filtro_atual)
                 historico_acao.append(imagem_com_efeitos.copy())
-                if usando_webcam and not gravando_video:
-                    iniciar_video_writer(imagem_com_efeitos)
                 atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
@@ -364,6 +390,7 @@ def callback_mouse(evento, x, y, flags, parametros):
                     salvar_imagem(imagem_com_efeitos)
             elif x_desfazer <= x <= x_desfazer + largura_botoes:
                 desfazer_acao()
+
 
 def carregar_imagem_e_iniciar():
     """
@@ -401,7 +428,7 @@ def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, imagem_com_efeitos, miniaturas
+    global usando_webcam, imagem_com_efeitos, imagem_com_adesivos, miniaturas
 
     usando_webcam = True
     captura = cv2.VideoCapture(0)
@@ -409,20 +436,25 @@ def inicializar_webcam():
         print("Erro ao acessar a webcam.")
         return
 
+    ret, frame = captura.read()
+    if not ret:
+        print("Erro ao capturar o frame inicial.")
+        return
+
+    imagem_com_adesivos = np.zeros_like(frame)  # Inicializa camada de adesivos
+    gerar_miniaturas(frame)
+
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
-
-    ret, frame = captura.read()
-    if ret:
-        gerar_miniaturas(frame)
 
     while True:
         ret, frame = captura.read()
         if not ret:
             break
 
-        # Corrigido para usar aplicar_filtro_generico
-        imagem_com_efeitos = aplicar_filtro_generico(frame, indice_filtro_atual)
+        frame_com_filtro = aplicar_filtro_generico(frame, indice_filtro_atual)
+        imagem_com_efeitos = cv2.add(frame_com_filtro, imagem_com_adesivos)  # Combina adesivos e frame com filtro
+
         salvar_frame_webcam(imagem_com_efeitos)
         atualizar_janela()
 

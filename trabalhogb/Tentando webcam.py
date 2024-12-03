@@ -343,6 +343,8 @@ def callback_mouse(evento, x, y, flags, parametros):
             adesivo = list(adesivos.values())[indice_adesivo_atual]
             if usando_webcam:
                 aplicar_adesivo_webcam(imagem_com_efeitos, adesivo, x_original, y_original)
+                if not gravando_video:  # Inicia a gravação se ainda não estiver gravando
+                    iniciar_video_writer(imagem_com_efeitos)
             else:
                 historico_acao.append(imagem_com_efeitos.copy())
                 aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
@@ -354,6 +356,8 @@ def callback_mouse(evento, x, y, flags, parametros):
                 indice_filtro_atual = indice_filtro
                 if usando_webcam:
                     imagem_com_efeitos = aplicar_filtro_generico(imagem_com_efeitos, indice_filtro_atual)
+                    if not gravando_video:  # Inicia a gravação se ainda não estiver gravando
+                        iniciar_video_writer(imagem_com_efeitos)
                 else:
                     imagem_com_efeitos = aplicar_filtro_generico(imagem_original, indice_filtro_atual)
                 historico_acao.append(imagem_com_efeitos.copy())
@@ -387,19 +391,6 @@ def callback_mouse(evento, x, y, flags, parametros):
             elif x_desfazer <= x <= x_desfazer + largura_botoes:
                 desfazer_acao()
 
-        elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
-            largura_botoes = 200
-            espaco_botoes = 20
-            x_salvar = (LARGURA_JANELA // 2) - largura_botoes - espaco_botoes
-            x_desfazer = (LARGURA_JANELA // 2) + espaco_botoes
-
-            if x_salvar <= x <= x_salvar + largura_botoes:
-                if usando_webcam and gravando_video:
-                    finalizar_video_writer()
-                else:
-                    salvar_imagem(imagem_com_efeitos)
-            elif x_desfazer <= x <= x_desfazer + largura_botoes:
-                desfazer_acao()
 
 def carregar_imagem_e_iniciar():
     """
