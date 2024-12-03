@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from tkinter import Tk, filedialog
+from tkinter import Tk, filedialog, Toplevel, Button, Label
 
 # ---------------------------------------
 # Configurações iniciais e variáveis globais
@@ -30,6 +30,8 @@ imagem_original = None    # Imagem original carregada pelo usuário
 imagem_com_efeitos = None # Imagem com filtros e adesivos aplicados
 escala_visualizacao = None # Escala da imagem para ajustar ao quadro de edição
 miniaturas = []           # Miniaturas de filtros disponíveis para exibição
+usando_webcam = False     # Define se o programa está utilizando a webcam
+captura_webcam = None     # Objeto de captura da webcam
 
 # Dimensões do quadro de edição e elementos da interface
 LARGURA_JANELA = 1366
@@ -96,7 +98,7 @@ def aplicar_adesivo(imagem_fundo, adesivo, x, y):
 
 def aplicar_filtro(imagem, indice_filtro):
     """
-    Aplica um dos filtros predefinidos com base no índice selecionado.
+    Aplica o filtro selecionado na imagem.
     """
     if indice_filtro == 0:  # Original
         return imagem.copy()
@@ -131,7 +133,7 @@ def aplicar_filtro(imagem, indice_filtro):
 
 def salvar_imagem(imagem):
     """
-    Salva a imagem atual na pasta que o usuário desejar.
+    Salva a imagem atual no local desejado.
     """
     Tk().withdraw()
     caminho_salvar = filedialog.asksaveasfilename(
@@ -146,15 +148,18 @@ def salvar_imagem(imagem):
 
 def desfazer_acao():
     """
-    Desfaz a última ação do usuário, caso possível.
+    Desfaz a última ação do usuário.
     """
     global imagem_com_efeitos, historico_acao
     if len(historico_acao) > 1:
-        imagem_com_efeitos = historico_acao.pop(-1).copy()
+        historico_acao.pop()
+        imagem_com_efeitos = historico_acao[-1].copy()
         atualizar_janela()
+
+
 def gerar_miniaturas(imagem):
     """
-    Gera miniaturas dos filtros disponíveis para exibição na barra.
+    Gera miniaturas dos filtros para exibição na barra.
     """
     miniaturas = []
     for i in range(len(nomes_filtros)):
@@ -167,7 +172,7 @@ def gerar_miniaturas(imagem):
 
 def atualizar_janela():
     """
-    Atualiza a janela principal com a imagem, área de adesivos, barra de filtros e botões.
+    Atualiza a interface principal.
     """
     visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
     largura_total = LARGURA_JANELA
@@ -182,8 +187,8 @@ def atualizar_janela():
     janela[y_offset_frame:y_offset_frame + visualizacao.shape[0], x_offset_frame:x_offset_frame + visualizacao.shape[1]] = visualizacao
     janela[y_offset_frame + visualizacao.shape[0]:y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA] = desenhar_barra_de_filtros(largura_total)
     desenhar_botoes(janela, largura_total, y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA)
+        # Exibe a janela com o frame atualizado
     cv2.imshow("Editor", janela)
-
 
 def desenhar_area_adesivos(largura):
     """
@@ -238,7 +243,8 @@ def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
     """
-    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual
+    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual, usando_webcam
+
     visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
     x_offset_frame = (LARGURA_JANELA - LARGURA_FRAME) // 2
     y_offset_frame = ALTURA_ADESIVOS
@@ -279,16 +285,31 @@ def callback_mouse(evento, x, y, flags, parametros):
                 desfazer_acao()
 
 
-# ---------------------------------------
-# Fluxo principal do programa
-# ---------------------------------------
-
-def main():
+def selecionar_fonte():
     """
-    Executa o programa principal.
+    Solicita ao usuário que escolha entre carregar uma imagem ou usar a webcam.
     """
-    global imagem_com_efeitos, imagem_original, miniaturas, historico_acao
+    global usando_webcam, captura_webcam
 
+    janela_selecao = Toplevel()
+    janela_selecao.geometry("300x150")
+    janela_selecao.title("Selecionar Fonte")
+
+    Label(janela_selecao, text="Escolha a fonte da imagem:").pack(pady=20)
+
+    Button(janela_selecao, text="Carregar Imagem", command=lambda: carregar_imagem(janela_selecao)).pack(pady=10)
+    Button(janela_selecao, text="Usar Webcam", command=lambda: usar_webcam(janela_selecao)).pack(pady=10)
+
+    janela_selecao.mainloop()
+
+
+def carregar_imagem(janela):
+    """
+    Carrega uma imagem do disco e inicializa o programa.
+    """
+    global imagem_original, imagem_com_efeitos, historico_acao, miniaturas
+
+    janela.destroy()
     Tk().withdraw()
     caminho_imagem = filedialog.askopenfilename(
         title="Selecione uma imagem",
@@ -310,16 +331,49 @@ def main():
     atualizar_janela()
     cv2.setMouseCallback("Editor", callback_mouse)
 
+
+def usar_webcam(janela):
+    """
+    Inicia a captura da webcam e aplica os filtros/adesivos em tempo real.
+    """
+    global usando_webcam, captura_webcam, imagem_original, imagem_com_efeitos
+
+    janela.destroy()
+    usando_webcam = True
+    captura_webcam = cv2.VideoCapture(0)
+
+    if not captura_webcam.isOpened():
+        print("Erro ao acessar a webcam.")
+        exit(1)
+
     while True:
-        tecla = cv2.waitKey(1) & 0xFF
-        if tecla == 27:
+        ret, frame = captura_webcam.read()
+        if not ret:
+            print("Erro ao capturar o vídeo da webcam.")
             break
 
+        imagem_original = frame.copy()
+        imagem_com_efeitos = aplicar_filtro(frame, indice_filtro_atual)
+
+        atualizar_janela()
+        tecla = cv2.waitKey(1) & 0xFF
+        if tecla == 27:  # Pressione ESC para sair
+            break
+
+    captura_webcam.release()
     cv2.destroyAllWindows()
 
 
 # ---------------------------------------
-# Executa o programa
+# Fluxo principal do programa
 # ---------------------------------------
+
+def main():
+    """
+    Executa o programa principal.
+    """
+    selecionar_fonte()
+
+
 if __name__ == "__main__":
     main()
