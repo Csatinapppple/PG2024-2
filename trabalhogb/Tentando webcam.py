@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from tkinter import Tk, filedialog, Toplevel, Button, Label
+from tkinter import Tk, filedialog, Button, Label
 
 # ---------------------------------------
 # Configurações iniciais e variáveis globais
@@ -181,145 +181,14 @@ def gerar_miniaturas(imagem):
         miniaturas.append(miniatura)
     return miniaturas
 
-def inicializar_webcam():
-    """
-    Inicializa o modo de webcam e configura os elementos para aplicar filtros e adesivos.
-    """
-    global usando_webcam, imagem_com_efeitos, video_writer
-    usando_webcam = True
-
-    # Inicializa a captura de vídeo
-    captura = cv2.VideoCapture(0)
-    if not captura.isOpened():
-        print("Erro ao acessar a webcam.")
-        exit(1)
-
-    # Configura o gravador de vídeo (caso necessário)
-    video_writer = None
-
-    while True:
-        ret, frame = captura.read()
-        if not ret:
-            print("Erro ao capturar frame da webcam.")
-            break
-
-        # Converte o frame para escala de cinza para a detecção
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-
-        # Realiza a detecção de rostos
-        rostos = face_classifier.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=4, minSize=(30, 30))
-
-        # Desenha retângulos ao redor dos rostos detectados
-        for (x, y, w, h) in rostos:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-            # Região de interesse para olhos e sorriso dentro do rosto
-            roi_gray = gray[y:y + h, x:x + w]
-            roi_color = frame[y:y + h, x:x + w]
-
-            # Detecção de olhos
-            olhos = eye_classifier.detectMultiScale(roi_gray)
-            for (ex, ey, ew, eh) in olhos:
-                cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (255, 0, 0), 2)
-
-            # Detecção de sorriso
-            sorrisos = smile_classifier.detectMultiScale(roi_gray, scaleFactor=1.7, minNeighbors=22)
-            for (sx, sy, sw, sh) in sorrisos:
-                cv2.rectangle(roi_color, (sx, sy), (sx + sw, sy + sh), (0, 255, 255), 2)
-
-        # Redimensiona o frame para o tamanho do frame view
-        frame_redimensionado = redimensionar_para_visualizacao(frame)
-        imagem_com_efeitos = frame_redimensionado.copy()
-
-        # Aplica o filtro selecionado no frame da webcam
-        imagem_com_efeitos = aplicar_filtro(imagem_com_efeitos, indice_filtro_atual)
-
-        # Atualiza a janela
-        atualizar_janela()
-
-        # Salva o frame no arquivo de vídeo (se necessário)
-        if video_writer is not None:
-            salvar_frame_webcam(frame)
-
-        # Lê a tecla pressionada pelo usuário
-        tecla = cv2.waitKey(1) & 0xFF
-        if tecla == 27:  # Tecla ESC para sair
-            break
-
-    captura.release()
-    if video_writer:
-        video_writer.release()
-    cv2.destroyAllWindows()
-
-def escolher_modo():
-    """
-    Exibe uma janela inicial para o usuário escolher entre carregar uma imagem ou usar a webcam.
-    """
-    root = Tk()
-    root.title("Escolha o Modo")
-    root.geometry("300x150")
-    root.resizable(False, False)
-
-    Label(root, text="Escolha o modo de edição:", font=("Arial", 12)).pack(pady=10)
-
-    def carregar_imagem():
-        """
-        Função chamada quando o usuário escolhe carregar uma imagem.
-        """
-        root.destroy()
-        carregar_imagem_e_iniciar()
-
-    def usar_webcam():
-        """
-        Função chamada quando o usuário escolhe usar a webcam.
-        """
-        root.destroy()
-        inicializar_webcam()
-
-    Button(root, text="Carregar Imagem", command=carregar_imagem, width=20, height=2).pack(pady=5)
-    Button(root, text="Usar Webcam", command=usar_webcam, width=20, height=2).pack(pady=5)
-
-    root.mainloop()
-
-def carregar_imagem_e_iniciar():
-    """
-    Permite ao usuário carregar uma imagem e inicializa o editor de imagem.
-    """
-    global imagem_com_efeitos, imagem_original, miniaturas, historico_acao
-
-    Tk().withdraw()
-    caminho_imagem = filedialog.askopenfilename(
-        title="Selecione uma imagem",
-        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.tiff *.gif")]
-    )
-    if not caminho_imagem:
-        print("Nenhuma imagem selecionada.")
-        return
-
-    imagem_original = cv2.imread(caminho_imagem)
-    if imagem_original is None:
-        print("Erro ao carregar a imagem.")
-        return
-
-    imagem_com_efeitos = imagem_original.copy()
-    historico_acao.append(imagem_com_efeitos.copy())
-    miniaturas = gerar_miniaturas(imagem_original)
-
-    atualizar_janela()
-    cv2.setMouseCallback("Editor", callback_mouse)
-
-    while True:
-        tecla = cv2.waitKey(1) & 0xFF
-        if tecla == 27:  # Tecla ESC para sair
-            break
-
-    cv2.destroyAllWindows()
-
 def atualizar_janela():
     """
-    Atualiza a janela principal com a imagem, área de adesivos, barra de filtros e botões.
+    Atualiza a janela principal com a imagem ou frame da webcam.
     """
+    global imagem_com_efeitos
+    if imagem_com_efeitos is None:
+        return
+
     visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
     largura_total = LARGURA_JANELA
     altura_total = ALTURA_JANELA
@@ -386,7 +255,7 @@ def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
     """
-    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual, usando_webcam
+    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual
     visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
     x_offset_frame = (LARGURA_JANELA - LARGURA_FRAME) // 2
     y_offset_frame = ALTURA_ADESIVOS
@@ -425,9 +294,93 @@ def callback_mouse(evento, x, y, flags, parametros):
             elif x_desfazer <= x <= x_desfazer + largura_botoes:
                 desfazer_acao()
 
+def carregar_imagem_e_iniciar():
+    """
+    Permite ao usuário carregar uma imagem e inicializa o editor.
+    """
+    global imagem_original, imagem_com_efeitos, miniaturas, historico_acao
+
+    Tk().withdraw()
+    caminho_imagem = filedialog.askopenfilename(
+        title="Selecione uma imagem",
+        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.tiff *.gif")]
+    )
+    if not caminho_imagem:
+        return
+
+    imagem_original = cv2.imread(caminho_imagem)
+    if imagem_original is None:
+        print("Erro ao carregar a imagem.")
+        return
+
+    imagem_com_efeitos = imagem_original.copy()
+    historico_acao = [imagem_com_efeitos.copy()]
+    miniaturas = gerar_miniaturas(imagem_original)
+
+    cv2.namedWindow("Editor")
+    cv2.setMouseCallback("Editor", callback_mouse)
+    atualizar_janela()
+
+    while True:
+        if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
+            break
+
+    cv2.destroyAllWindows()
+
+def inicializar_webcam():
+    """
+    Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
+    """
+    global usando_webcam, video_writer
+    usando_webcam = True
+
+    captura = cv2.VideoCapture(0)
+    if not captura.isOpened():
+        print("Erro ao acessar a webcam.")
+        return
+
+    cv2.namedWindow("Editor")
+    cv2.setMouseCallback("Editor", callback_mouse)
+
+    while True:
+        ret, frame = captura.read()
+        if not ret:
+            break
+
+        frame_com_efeito = aplicar_filtro(frame, indice_filtro_atual)
+        salvar_frame_webcam(frame_com_efeito)
+
+        imagem_com_efeitos = frame_com_efeito
+        atualizar_janela()
+
+        if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
+            break
+
+    captura.release()
+    if video_writer:
+        video_writer.release()
+    cv2.destroyAllWindows()
+
+def escolher_modo():
+    """
+    Exibe uma interface inicial para o usuário escolher entre usar webcam ou carregar uma imagem.
+    """
+    root = Tk()
+    root.title("Escolha o Modo")
+    root.geometry("300x150")
+    root.resizable(False, False)
+
+    Label(root, text="Escolha o modo de edição:", font=("Arial", 12)).pack(pady=10)
+    Button(root, text="Carregar Imagem", command=lambda: [root.destroy(), carregar_imagem_e_iniciar()],
+           width=20, height=2).pack(pady=5)
+    Button(root, text="Usar Webcam", command=lambda: [root.destroy(), inicializar_webcam()],
+           width=20, height=2).pack(pady=5)
+
+    root.mainloop()
+
 def main():
     """
-    Executa o programa principal, permitindo ao usuário escolher entre usar webcam ou carregar imagem.
+    Executa o programa principal.
     """
     escolher_modo()
 
