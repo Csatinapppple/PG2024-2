@@ -33,6 +33,7 @@ miniaturas = []           # Miniaturas de filtros disponíveis para exibição
 usando_webcam = False     # Indica se o programa está usando a webcam
 video_writer = None       # Gravador de vídeo para salvar frames da webcam
 video_filename = None     # Nome do arquivo de vídeo para salvar
+gravando_video = False
 
 # Dimensões do quadro de edição e elementos da interface
 LARGURA_JANELA = 1366
@@ -97,41 +98,41 @@ def aplicar_adesivo(imagem_fundo, adesivo, x, y):
     sobreposicao = cv2.add(fundo, adesivo_rgb)
     imagem_fundo[y:y + altura_adesivo, x:x + largura_adesivo] = sobreposicao
 
-def aplicar_filtro(imagem, indice_filtro):
+def aplicar_filtro_generico(imagem_base, indice_filtro):
     """
-    Aplica um dos filtros predefinidos com base no índice selecionado.
+    Aplica um dos filtros predefinidos na imagem base fornecida.
     """
-    if imagem is None:
+    if imagem_base is None:
         return None
     if indice_filtro == 0:  # Original
-        return imagem.copy()
+        return imagem_base.copy()
     elif indice_filtro == 1:  # Escala de Cinza
-        filtro = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        filtro = cv2.cvtColor(imagem_base, cv2.COLOR_BGR2GRAY)
         return cv2.cvtColor(filtro, cv2.COLOR_GRAY2BGR)
     elif indice_filtro == 2:  # Inversão
-        return cv2.bitwise_not(imagem)
+        return cv2.bitwise_not(imagem_base)
     elif indice_filtro == 3:  # Desfoque
-        return cv2.GaussianBlur(imagem, (15, 15), 0)
+        return cv2.GaussianBlur(imagem_base, (15, 15), 0)
     elif indice_filtro == 4:  # Efeito Tumblr
-        return cv2.applyColorMap(imagem, cv2.COLORMAP_PINK)
+        return cv2.applyColorMap(imagem_base, cv2.COLORMAP_PINK)
     elif indice_filtro == 5:  # Efeito Prism
-        return cv2.applyColorMap(imagem, cv2.COLORMAP_RAINBOW)
+        return cv2.applyColorMap(imagem_base, cv2.COLORMAP_RAINBOW)
     elif indice_filtro == 6:  # Vintage
         sepia_filter = np.array([[0.272, 0.534, 0.131],
                                  [0.349, 0.686, 0.168],
                                  [0.393, 0.769, 0.189]])
-        imagem_vintage = cv2.transform(imagem, sepia_filter)
+        imagem_vintage = cv2.transform(imagem_base, sepia_filter)
         return np.clip(imagem_vintage, 0, 255).astype(np.uint8)
     elif indice_filtro == 7:  # Silly Face
-        return cv2.add(imagem, np.full_like(imagem, 30))
+        return cv2.add(imagem_base, np.full_like(imagem_base, 30))
     elif indice_filtro == 8:  # Kyle+Kendall Slim
-        return cv2.bilateralFilter(imagem, 15, 80, 80)
+        return cv2.bilateralFilter(imagem_base, 15, 80, 80)
     elif indice_filtro == 9:  # Filtro Kodak
         lookup_table = np.array([min(i + 20, 255) for i in range(256)]).astype("uint8")
-        return cv2.LUT(imagem, lookup_table)
+        return cv2.LUT(imagem_base, lookup_table)
     elif indice_filtro == 10:  # Negativo da Foto
-        return cv2.bitwise_not(imagem)
-    return imagem
+        return cv2.bitwise_not(imagem_base)
+    return imagem_base
 
 def salvar_imagem(imagem):
     """
@@ -149,56 +150,46 @@ def salvar_imagem(imagem):
 
 def iniciar_video_writer(frame):
     """
-    Inicializa o gravador de vídeo no formato MP4 com codec mp4v.
-    Permite ao usuário escolher o local e nome do arquivo para salvar.
+    Inicializa o gravador de vídeo após o usuário escolher o local de salvamento.
     """
-    global video_writer, video_filename
+    global video_writer, video_filename, gravando_video
 
-    if video_writer is None:
-        # Permite ao usuário selecionar o local para salvar o vídeo
-        Tk().withdraw()
-        video_filename = filedialog.asksaveasfilename(
-            title="Salvar vídeo como",
-            defaultextension=".mp4",
-            filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")]
-        )
-        if not video_filename:
-            print("Nenhum arquivo selecionado. Gravação de vídeo cancelada.")
-            return
+    Tk().withdraw()
+    video_filename = filedialog.asksaveasfilename(
+        title="Salvar vídeo como",
+        defaultextension=".mp4",
+        filetypes=[("Vídeo MP4", "*.mp4"), ("Todos os arquivos", "*.*")]
+    )
 
-        # Define o codec mp4v para maior compatibilidade
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        # Inicializa o gravador de vídeo com 30 FPS e as dimensões do frame
-        video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
-        if not video_writer.isOpened():
-            print("Erro ao inicializar o gravador de vídeo.")
-            video_writer = None
-        else:
-            print(f"Iniciando gravação de vídeo: {video_filename}")
+    if not video_filename:
+        print("Gravação de vídeo cancelada.")
+        return
 
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(video_filename, fourcc, 30, (frame.shape[1], frame.shape[0]))
+    gravando_video = True
+    print(f"Gravação de vídeo iniciada: {video_filename}")
 
 def salvar_frame_webcam(frame):
     """
-    Salva um frame capturado da webcam no arquivo de vídeo.
+    Salva o frame atual no gravador de vídeo, se a gravação estiver ativa.
     """
-    global video_writer
-    if video_writer is not None:
-        video_writer.write(frame)  # Escreve o frame no arquivo de vídeo
+    global video_writer, gravando_video
 
+    if gravando_video and video_writer is not None:
+        video_writer.write(frame)
 
 def finalizar_video_writer():
     """
-    Finaliza e salva o vídeo gravado.
+    Finaliza o gravador de vídeo e salva o arquivo.
     """
-    global video_writer, video_filename
+    global video_writer, gravando_video, video_filename
 
-    if video_writer is not None:
-        print("Salvando vídeo... Por favor, aguarde.")
+    if gravando_video and video_writer is not None:
         video_writer.release()
         video_writer = None
-        print(f"Vídeo salvo com sucesso em: {video_filename}")
-    else:
-        print("Nenhum vídeo foi gravado.")
+        gravando_video = False
+        print(f"Vídeo salvo em: {video_filename}")
 
 def desfazer_acao():
     """
@@ -217,7 +208,7 @@ def gerar_miniaturas(imagem):
     global miniaturas
     miniaturas = []
     for i in range(len(nomes_filtros)):
-        filtro_aplicado = aplicar_filtro(imagem, i)
+        filtro_aplicado = aplicar_filtro_generico(imagem, i)  # Corrigido para usar aplicar_filtro_generico
         largura_miniatura = LARGURA_JANELA // len(nomes_filtros)
         miniatura = cv2.resize(filtro_aplicado, (largura_miniatura, 80))
         miniaturas.append(miniatura)
@@ -308,20 +299,19 @@ def callback_mouse(evento, x, y, flags, parametros):
     """
     Lida com cliques e eventos do mouse na interface.
     """
-    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual, video_writer, usando_webcam
-
-    if imagem_com_efeitos is None:
-        return
-
-    visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
-    x_offset_frame = (LARGURA_JANELA - LARGURA_FRAME) // 2
-    y_offset_frame = ALTURA_ADESIVOS
+    global imagem_com_efeitos, imagem_original, historico_acao, indice_adesivo_atual, indice_filtro_atual, gravando_video
 
     if evento == cv2.EVENT_LBUTTONDOWN:
+        visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
+        x_offset_frame = (LARGURA_JANELA - LARGURA_FRAME) // 2
+        y_offset_frame = ALTURA_ADESIVOS
+
         if 0 <= y <= ALTURA_ADESIVOS:
             indice = x // 90
             if indice < len(adesivos):
                 indice_adesivo_atual = indice
+                if usando_webcam and not gravando_video:
+                    iniciar_video_writer(imagem_com_efeitos)
                 atualizar_janela()
 
         elif y_offset_frame <= y <= y_offset_frame + visualizacao_altura:
@@ -330,18 +320,21 @@ def callback_mouse(evento, x, y, flags, parametros):
             adesivo = list(adesivos.values())[indice_adesivo_atual]
             historico_acao.append(imagem_com_efeitos.copy())
             aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
-            if usando_webcam and video_writer is None:
-                iniciar_video_writer(imagem_com_efeitos)  # Inicia o vídeo se não iniciado
+            if usando_webcam and not gravando_video:
+                iniciar_video_writer(imagem_com_efeitos)
             atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura < y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA:
             indice_filtro = x // (LARGURA_JANELA // len(nomes_filtros))
             if indice_filtro < len(nomes_filtros):
                 indice_filtro_atual = indice_filtro
-                imagem_com_efeitos = aplicar_filtro(imagem_com_efeitos, indice_filtro_atual)
+                if usando_webcam:
+                    imagem_com_efeitos = aplicar_filtro_generico(imagem_com_efeitos, indice_filtro_atual)
+                else:
+                    imagem_com_efeitos = aplicar_filtro_generico(imagem_original, indice_filtro_atual)
                 historico_acao.append(imagem_com_efeitos.copy())
-                if usando_webcam and video_writer is None:
-                    iniciar_video_writer(imagem_com_efeitos)  # Inicia o vídeo se não iniciado
+                if usando_webcam and not gravando_video:
+                    iniciar_video_writer(imagem_com_efeitos)
                 atualizar_janela()
 
         elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
@@ -351,8 +344,22 @@ def callback_mouse(evento, x, y, flags, parametros):
             x_desfazer = (LARGURA_JANELA // 2) + espaco_botoes
 
             if x_salvar <= x <= x_salvar + largura_botoes:
-                if usando_webcam:
-                    finalizar_video_writer()  # Finaliza o vídeo antes de salvar
+                if usando_webcam and gravando_video:
+                    finalizar_video_writer()
+                else:
+                    salvar_imagem(imagem_com_efeitos)
+            elif x_desfazer <= x <= x_desfazer + largura_botoes:
+                desfazer_acao()
+
+        elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
+            largura_botoes = 200
+            espaco_botoes = 20
+            x_salvar = (LARGURA_JANELA // 2) - largura_botoes - espaco_botoes
+            x_desfazer = (LARGURA_JANELA // 2) + espaco_botoes
+
+            if x_salvar <= x <= x_salvar + largura_botoes:
+                if usando_webcam and gravando_video:
+                    finalizar_video_writer()
                 else:
                     salvar_imagem(imagem_com_efeitos)
             elif x_desfazer <= x <= x_desfazer + largura_botoes:
@@ -387,15 +394,14 @@ def carregar_imagem_e_iniciar():
 
     while True:
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
-            break
-
-    cv2.destroyAllWindows()
+            cv2.destroyAllWindows()
+            exit(0)  # Finaliza o programa
 
 def inicializar_webcam():
     """
     Inicializa a webcam e permite aplicar filtros e adesivos em tempo real.
     """
-    global usando_webcam, video_writer, imagem_com_efeitos, historico_acao
+    global usando_webcam, imagem_com_efeitos, miniaturas
 
     usando_webcam = True
     captura = cv2.VideoCapture(0)
@@ -406,28 +412,26 @@ def inicializar_webcam():
     cv2.namedWindow("Editor")
     cv2.setMouseCallback("Editor", callback_mouse)
 
+    ret, frame = captura.read()
+    if ret:
+        gerar_miniaturas(frame)
+
     while True:
         ret, frame = captura.read()
         if not ret:
             break
 
-        # Aplica filtro no frame atual
-        frame_com_efeito = aplicar_filtro(frame, indice_filtro_atual)
-
-        # Salva frame no vídeo
-        salvar_frame_webcam(frame_com_efeito)
-
-        # Adiciona adesivos, se selecionado
-        imagem_com_efeitos = frame_com_efeito.copy()
+        # Corrigido para usar aplicar_filtro_generico
+        imagem_com_efeitos = aplicar_filtro_generico(frame, indice_filtro_atual)
+        salvar_frame_webcam(imagem_com_efeitos)
         atualizar_janela()
 
         if cv2.waitKey(1) & 0xFF == 27:  # Tecla ESC para sair
-            break
+            captura.release()
+            finalizar_video_writer()
+            cv2.destroyAllWindows()
+            exit(0)  # Finaliza o programa
 
-    captura.release()
-    if video_writer:
-        finalizar_video_writer()  # Garante finalização do vídeo
-    cv2.destroyAllWindows()
 
 def escolher_modo():
     """
