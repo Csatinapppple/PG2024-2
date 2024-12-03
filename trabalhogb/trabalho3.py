@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from tkinter import Tk, filedialog
+from tkinter import Tk, filedialog, Button, Frame
 
 # ---------------------------------------
 # Configurações iniciais e variáveis globais
@@ -33,13 +33,13 @@ escala_visualizacao = None # Escala da imagem para ajustar ao quadro de edição
 miniaturas = []           # Miniaturas de filtros disponíveis para exibição
 
 # Dimensões do quadro de edição e elementos da interface
-LARGURA_FRAME = 960       # Reduzido para 70% do tamanho original
-ALTURA_FRAME = 540        # Reduzido para 70% do tamanho original
+LARGURA_FRAME = 768       # Reduzido em 20% do tamanho anterior
+ALTURA_FRAME = 432        # Reduzido em 20% do tamanho anterior
 ALTURA_BARRA = 100        # Altura da barra de filtros
 ALTURA_ADESIVOS = 100     # Altura da área de adesivos
 ALTURA_BOTOES = 50        # Altura dos botões "Salvar" e "Desfazer"
 
-# Nomes dos filtros disponíveis (filtros removidos: "Pretty Freckles" e "Filtro P&B")
+# Nomes dos filtros disponíveis
 nomes_filtros = [
     "Original",             # Filtro 0
     "Escala de Cinza",      # Filtro 1
@@ -50,7 +50,8 @@ nomes_filtros = [
     "Vintage",              # Filtro 6
     "Silly Face",           # Filtro 7
     "Kyle+Kendall Slim",    # Filtro 8
-    "Filtro Kodak"          # Filtro 9
+    "Filtro Kodak",         # Filtro 9
+    "Negativo da Foto"      # Filtro 10
 ]
 
 # ---------------------------------------
@@ -124,9 +125,35 @@ def aplicar_filtro(imagem, indice_filtro):
     elif indice_filtro == 9:  # Filtro Kodak
         lookup_table = np.array([min(i + 20, 255) for i in range(256)]).astype("uint8")
         return cv2.LUT(imagem, lookup_table)
+    elif indice_filtro == 10:  # Negativo da Foto
+        return cv2.bitwise_not(imagem)
     return imagem
 
 
+def salvar_imagem(imagem):
+    """
+    Salva a imagem atual na pasta que o usuário desejar.
+    """
+    Tk().withdraw()
+    caminho_salvar = filedialog.asksaveasfilename(
+        title="Salvar imagem como",
+        defaultextension=".png",
+        filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
+    )
+    if caminho_salvar:
+        cv2.imwrite(caminho_salvar, imagem)
+        print(f"Imagem salva em {caminho_salvar}")
+
+
+def desfazer_acao():
+    """
+    Desfaz a última ação do usuário, caso possível.
+    """
+    global imagem_com_efeitos, historico_acao
+    if len(historico_acao) > 1:
+        historico_acao.pop()
+        imagem_com_efeitos = historico_acao[-1].copy()
+        atualizar_janela()
 def gerar_miniaturas(imagem):
     """
     Gera miniaturas dos filtros disponíveis para exibição na barra.
@@ -141,11 +168,11 @@ def gerar_miniaturas(imagem):
 
 def atualizar_janela():
     """
-    Atualiza a janela principal com a imagem, área de adesivos e barra de filtros.
+    Atualiza a janela principal com a imagem, área de adesivos, barra de filtros e botões.
     """
     visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
     largura_total = visualizacao.shape[1]
-    altura_total = visualizacao.shape[0] + ALTURA_ADESIVOS + ALTURA_BARRA
+    altura_total = visualizacao.shape[0] + ALTURA_ADESIVOS + ALTURA_BARRA + ALTURA_BOTOES
     janela = np.zeros((altura_total, largura_total, 3), dtype=np.uint8)
 
     # Adiciona área de adesivos
@@ -155,7 +182,12 @@ def atualizar_janela():
     janela[ALTURA_ADESIVOS:ALTURA_ADESIVOS + visualizacao.shape[0]] = visualizacao
 
     # Adiciona a barra de filtros
-    janela[ALTURA_ADESIVOS + visualizacao.shape[0]:] = desenhar_barra_de_filtros(largura_total)
+    janela[ALTURA_ADESIVOS + visualizacao.shape[0]:ALTURA_ADESIVOS + visualizacao.shape[0] + ALTURA_BARRA] = desenhar_barra_de_filtros(
+        largura_total
+    )
+
+    # Adiciona os botões abaixo da barra de filtros
+    desenhar_botoes(janela, largura_total, ALTURA_ADESIVOS + visualizacao.shape[0] + ALTURA_BARRA)
 
     cv2.imshow("Editor", janela)
 
@@ -191,6 +223,27 @@ def desenhar_barra_de_filtros(largura):
             cv2.rectangle(barra, (x_offset, 10), (x_offset + miniatura_redimensionada.shape[1], 90), (0, 255, 0), 2)
         x_offset += largura_disponivel + 10
     return barra
+
+
+def desenhar_botoes(janela, largura, y_offset):
+    """
+    Desenha botões para "Salvar" e "Desfazer" abaixo da barra de filtros.
+    """
+    botao_salvar = Button(
+        text="Salvar",
+        command=lambda: salvar_imagem(imagem_com_efeitos),
+        bg="lightgray",
+        font=("Arial", 12),
+    )
+    botao_desfazer = Button(
+        text="Desfazer",
+        command=desfazer_acao,
+        bg="lightgray",
+        font=("Arial", 12),
+    )
+    # Usar tkinter para centralizar os botões
+    botao_salvar.pack(side="left", padx=20)
+    botao_desfazer.pack(side="left")
 
 
 def callback_mouse(evento, x, y, flags, parametros):
