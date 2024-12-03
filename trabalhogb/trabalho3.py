@@ -1,8 +1,12 @@
-import cv2  # Biblioteca para manipulação de imagens e vídeos
-import numpy as np  # Biblioteca para operações numéricas
-from tkinter import Tk, filedialog  # Interface gráfica para seleção de arquivos
+import cv2
+import numpy as np
+from tkinter import Tk, filedialog
 
-# Carregar adesivos (stickers) com transparência
+# ---------------------------------------
+# Configurações iniciais e variáveis globais
+# ---------------------------------------
+
+# Carregar adesivos com transparência
 adesivos = {
     'oculos': cv2.imread('eyeglasses.png', cv2.IMREAD_UNCHANGED),
     'chapeu': cv2.imread('hat.png', cv2.IMREAD_UNCHANGED),
@@ -12,46 +16,53 @@ adesivos = {
     'nascimento': cv2.imread('nascimento.png', cv2.IMREAD_UNCHANGED),
 }
 
-# Verifica se todos os adesivos foram carregados corretamente
+# Verifica se os adesivos foram carregados corretamente
 for nome, adesivo in adesivos.items():
     if adesivo is None:
         print(f"Erro ao carregar o adesivo: {nome}")
         exit(1)
 
 # Variáveis globais
-indice_adesivo_atual = 0
-indice_filtro_atual = 0
-historico_acao = []
-imagem_original = None
-imagem_para_visualizacao = None
-imagem_com_efeitos = None
-escala_visualizacao = None
+indice_adesivo_atual = 0  # Indica o adesivo selecionado
+indice_filtro_atual = 0   # Indica o filtro selecionado
+historico_acao = []       # Histórico de ações para desfazer alterações
+imagem_original = None    # Imagem original carregada pelo usuário
+imagem_para_visualizacao = None  # Imagem redimensionada para visualização
+imagem_com_efeitos = None # Imagem com filtros e adesivos aplicados
+escala_visualizacao = None # Escala da imagem para ajustar ao quadro de edição
+miniaturas = []           # Miniaturas de filtros disponíveis para exibição
 
-# Dimensões do frame de visualização
-LARGURA_FRAME = 800
-ALTURA_FRAME = 600
+# Dimensões do quadro de edição e elementos da interface
+LARGURA_FRAME = 960       # Reduzido para 70% do tamanho original
+ALTURA_FRAME = 540        # Reduzido para 70% do tamanho original
+ALTURA_BARRA = 100        # Altura da barra de filtros
+ALTURA_ADESIVOS = 100     # Altura da área de adesivos
+ALTURA_BOTOES = 50        # Altura dos botões "Salvar" e "Desfazer"
 
-# Lista de nomes dos filtros para exibição
+# Nomes dos filtros disponíveis (removido o "Clarendon")
 nomes_filtros = [
-    "Original", "Escala de Cinza", "Inversão", "Desfoque", "Clarendon",
-    "Efeito Tumblr", "Efeito Prism", "Pretty Freckles", "Vintage",
-    "Silly Face", "Kyle+Kendall Slim", "Filtro P&B", "Filtro Kodak"
+    "Original",             # Filtro 0
+    "Escala de Cinza",      # Filtro 1
+    "Inversão",             # Filtro 2
+    "Desfoque",             # Filtro 3
+    "Efeito Tumblr",        # Filtro 4
+    "Efeito Prism",         # Filtro 5
+    "Pretty Freckles",      # Filtro 6
+    "Vintage",              # Filtro 7
+    "Silly Face",           # Filtro 8
+    "Kyle+Kendall Slim",    # Filtro 9
+    "Filtro P&B",           # Filtro 10
+    "Filtro Kodak"          # Filtro 11
 ]
 
-# Função para selecionar uma imagem
-def selecionar_imagem():
-    Tk().withdraw()
-    caminho_arquivo = filedialog.askopenfilename(
-        title="Selecione uma imagem",
-        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.tiff *.gif")]
-    )
-    if not caminho_arquivo:
-        print("Nenhuma imagem selecionada. O programa será encerrado.")
-        exit(1)
-    return caminho_arquivo
+# ---------------------------------------
+# Funções auxiliares
+# ---------------------------------------
 
-# Função para redimensionar a imagem para o quadro de visualização
 def redimensionar_para_visualizacao(imagem):
+    """
+    Redimensiona a imagem para caber no quadro de edição, mantendo a proporção.
+    """
     global escala_visualizacao
     altura, largura = imagem.shape[:2]
     escala_visualizacao = min(LARGURA_FRAME / largura, ALTURA_FRAME / altura)
@@ -59,160 +70,220 @@ def redimensionar_para_visualizacao(imagem):
     nova_altura = int(altura * escala_visualizacao)
     return cv2.resize(imagem, (nova_largura, nova_altura))
 
-# Função para aplicar um adesivo na imagem
-def aplicar_adesivo(imagem_fundo, adesivo, posicao_x, posicao_y):
+
+def aplicar_adesivo(imagem_fundo, adesivo, x, y):
+    """
+    Aplica um adesivo na posição especificada (x, y) da imagem.
+    Suporta adesivos com canal alfa para transparência.
+    """
     altura_adesivo, largura_adesivo = adesivo.shape[:2]
-    altura_fundo, largura_fundo = imagem_fundo.shape[:2]
 
-    if posicao_x + largura_adesivo > largura_fundo or posicao_y + altura_adesivo > altura_fundo:
-        largura_adesivo = min(largura_adesivo, largura_fundo - posicao_x)
-        altura_adesivo = min(altura_adesivo, altura_fundo - posicao_y)
-        adesivo = adesivo[:altura_adesivo, :largura_adesivo]
-
-    if adesivo.shape[2] == 4:
+    # Separar canais e criar máscara caso o adesivo tenha canal alfa
+    if adesivo.shape[2] == 4:  # Verifica canal alfa
         azul, verde, vermelho, alfa = cv2.split(adesivo)
-        mascara = alfa.astype(np.uint8)
-        adesivo = cv2.merge((azul, verde, vermelho))
+        adesivo_rgb = cv2.merge((azul, verde, vermelho))
+        mascara = alfa
     else:
-        mascara = np.ones(adesivo.shape[:2], dtype=np.uint8) * 255
+        adesivo_rgb = adesivo
+        mascara = np.ones((altura_adesivo, largura_adesivo), dtype=np.uint8) * 255
 
-    area_interesse = imagem_fundo[posicao_y:posicao_y + altura_adesivo, posicao_x:posicao_x + largura_adesivo]
-    fundo_mascarado = cv2.bitwise_and(area_interesse, area_interesse, mask=cv2.bitwise_not(mascara))
-    adesivo_mascarado = cv2.bitwise_and(adesivo, adesivo, mask=mascara)
-    imagem_fundo[posicao_y:posicao_y + altura_adesivo, posicao_x:posicao_x + largura_adesivo] = cv2.add(fundo_mascarado, adesivo_mascarado)
-    return imagem_fundo
+    # Ajusta posição e evita sobreposição fora da imagem
+    if y + altura_adesivo > imagem_fundo.shape[0] or x + largura_adesivo > imagem_fundo.shape[1]:
+        return
+    roi = imagem_fundo[y:y + altura_adesivo, x:x + largura_adesivo]
+    fundo = cv2.bitwise_and(roi, roi, mask=cv2.bitwise_not(mascara))
+    sobreposicao = cv2.add(fundo, adesivo_rgb)
+    imagem_fundo[y:y + altura_adesivo, x:x + largura_adesivo] = sobreposicao
 
-# Função para aplicar filtros predefinidos
+
 def aplicar_filtro(imagem, indice_filtro):
-    if indice_filtro == 0:
+    """
+    Aplica um dos filtros predefinidos com base no índice selecionado.
+    """
+    if indice_filtro == 0:  # Original
         return imagem.copy()
-    elif indice_filtro == 1:
+    elif indice_filtro == 1:  # Escala de Cinza
         filtro = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
         return cv2.cvtColor(filtro, cv2.COLOR_GRAY2BGR)
-    elif indice_filtro == 2:
+    elif indice_filtro == 2:  # Inversão
         return cv2.bitwise_not(imagem)
-    elif indice_filtro == 3:
+    elif indice_filtro == 3:  # Desfoque
         return cv2.GaussianBlur(imagem, (15, 15), 0)
-    elif indice_filtro == 4:
-        return cv2.addWeighted(imagem, 1.2, cv2.GaussianBlur(imagem, (15, 15), 0), -0.2, 0)
-    elif indice_filtro == 5:
+    elif indice_filtro == 4:  # Efeito Tumblr
         return cv2.applyColorMap(imagem, cv2.COLORMAP_PINK)
-    elif indice_filtro == 6:
+    elif indice_filtro == 5:  # Efeito Prism
         return cv2.applyColorMap(imagem, cv2.COLORMAP_RAINBOW)
-    elif indice_filtro == 7:
+    elif indice_filtro == 6:  # Pretty Freckles
         return cv2.cvtColor(cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV), cv2.COLOR_HSV2BGR)
-    elif indice_filtro == 8:
+    elif indice_filtro == 7:  # Vintage
         sepia_filter = np.array([[0.272, 0.534, 0.131],
                                  [0.349, 0.686, 0.168],
                                  [0.393, 0.769, 0.189]])
         imagem_vintage = cv2.transform(imagem, sepia_filter)
         return np.clip(imagem_vintage, 0, 255).astype(np.uint8)
-    elif indice_filtro == 9:
+    elif indice_filtro == 8:  # Silly Face
         return cv2.add(imagem, np.full_like(imagem, 30))
-    elif indice_filtro == 10:
+    elif indice_filtro == 9:  # Kyle+Kendall Slim
         return cv2.bilateralFilter(imagem, 15, 80, 80)
-    elif indice_filtro == 11:
+    elif indice_filtro == 10:  # Filtro P&B
         pb_filter = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
         return cv2.merge([pb_filter, pb_filter, pb_filter])
-    elif indice_filtro == 12:
+    elif indice_filtro == 11:  # Filtro Kodak
         lookup_table = np.array([min(i + 20, 255) for i in range(256)]).astype("uint8")
         return cv2.LUT(imagem, lookup_table)
     return imagem
 
-# Função para desenhar o menu e o nome do filtro
-def desenhar_menu_e_filtro(imagem, nome_filtro):
-    instrucoes = [
-        "Teclas de Atalho:",
-        "'F' - Aplicar filtro",
-        "'C' - Alterar adesivo (scroll do mouse)",
-        "Clique esquerdo - Adicionar adesivo",
-        "'S' - Salvar imagem",
-        "Ctrl + Z - Desfazer",
-        "ESC - Sair"
-    ]
 
-    altura_linha = 20
-    margem = 10
-    altura_menu = len(instrucoes) * altura_linha + margem * 2
+def gerar_miniaturas(imagem):
+    """
+    Gera miniaturas dos filtros disponíveis para exibição na barra.
+    """
+    miniaturas = []
+    for i in range(len(nomes_filtros)):
+        filtro_aplicado = aplicar_filtro(imagem, i)
+        miniatura = cv2.resize(filtro_aplicado, (80, 80))
+        miniaturas.append(miniatura)
+    return miniaturas
 
-    altura, largura, _ = imagem.shape
-    sobreposicao = imagem.copy()
-    cv2.rectangle(sobreposicao, (0, altura - altura_menu), (largura, altura), (0, 0, 0), -1)
-    alpha = 0.6
-    imagem = cv2.addWeighted(sobreposicao, alpha, imagem, 1 - alpha, 0)
 
-    posicao_y = altura - altura_menu + margem
-    for linha in instrucoes:
-        cv2.putText(imagem, linha, (10, posicao_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        posicao_y += altura_linha
+def atualizar_janela():
+    """
+    Atualiza a janela principal com a imagem, área de adesivos e barra de filtros.
+    """
+    visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
+    largura_total = visualizacao.shape[1]
+    altura_total = visualizacao.shape[0] + ALTURA_ADESIVOS + ALTURA_BARRA
+    janela = np.zeros((altura_total, largura_total, 3), dtype=np.uint8)
 
-    cv2.putText(imagem, f"Filtro: {nome_filtro}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+    # Adiciona área de adesivos
+    janela[:ALTURA_ADESIVOS] = desenhar_area_adesivos(largura_total)
 
-    return imagem
+    # Adiciona a imagem editada
+    janela[ALTURA_ADESIVOS:ALTURA_ADESIVOS + visualizacao.shape[0]] = visualizacao
 
-# Callback para eventos do mouse
+    # Adiciona a barra de filtros
+    janela[ALTURA_ADESIVOS + visualizacao.shape[0]:] = desenhar_barra_de_filtros(largura_total)
+
+    cv2.imshow("Editor", janela)
+def desenhar_area_adesivos(largura):
+    """
+    Desenha a área horizontal com miniaturas de adesivos.
+    """
+    area = np.zeros((ALTURA_ADESIVOS, largura, 3), dtype=np.uint8)
+    x_offset = 10
+    for i, (nome, adesivo) in enumerate(adesivos.items()):
+        adesivo_redimensionado = cv2.resize(adesivo[:, :, :3], (80, 80))
+        area[10:90, x_offset:x_offset + 80] = adesivo_redimensionado
+        if i == indice_adesivo_atual:
+            cv2.rectangle(area, (x_offset, 10), (x_offset + 80, 90), (0, 255, 0), 2)
+        x_offset += 90
+    return area
+
+
+def desenhar_barra_de_filtros(largura):
+    """
+    Desenha a barra horizontal com miniaturas dos filtros.
+    """
+    barra = np.zeros((ALTURA_BARRA, largura, 3), dtype=np.uint8)
+    x_offset = 10
+    for i, miniatura in enumerate(miniaturas):
+        largura_disponivel = min(80, largura - x_offset - 10)
+        if largura_disponivel <= 0:
+            break
+        miniatura_redimensionada = cv2.resize(miniatura, (largura_disponivel, 80))
+        barra[10:10 + miniatura_redimensionada.shape[0], x_offset:x_offset + miniatura_redimensionada.shape[1]] = miniatura_redimensionada
+        if i == indice_filtro_atual:
+            cv2.rectangle(barra, (x_offset, 10), (x_offset + miniatura_redimensionada.shape[1], 90), (0, 255, 0), 2)
+        x_offset += largura_disponivel + 10
+    return barra
+
+
 def callback_mouse(evento, x, y, flags, parametros):
-    global imagem_com_efeitos, indice_adesivo_atual, historico_acao
+    """
+    Lida com cliques e eventos do mouse na interface.
+    """
+    global imagem_com_efeitos, historico_acao, indice_adesivo_atual, indice_filtro_atual
+    visualizacao_altura = redimensionar_para_visualizacao(imagem_com_efeitos).shape[0]
+
     if evento == cv2.EVENT_LBUTTONDOWN:
-        x_original = int(x / escala_visualizacao)
-        y_original = int(y / escala_visualizacao)
-        historico_acao.append(imagem_com_efeitos.copy())
-        adesivo = list(adesivos.values())[indice_adesivo_atual]
-        imagem_com_efeitos = aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
-        imagem_para_visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
-        imagem_com_menu = desenhar_menu_e_filtro(imagem_para_visualizacao.copy(), nomes_filtros[indice_filtro_atual])
-        cv2.imshow("Editor", imagem_com_menu)
+        # Verifica se o clique está na área dos adesivos
+        if 0 <= y <= ALTURA_ADESIVOS:
+            indice = x // 90
+            if indice < len(adesivos):
+                indice_adesivo_atual = indice
+                atualizar_janela()
+        # Verifica se o clique está na imagem para adicionar adesivo
+        elif ALTURA_ADESIVOS <= y <= ALTURA_ADESIVOS + visualizacao_altura:
+            x_original = int(x / escala_visualizacao)
+            y_original = int((y - ALTURA_ADESIVOS) / escala_visualizacao)
+            adesivo = list(adesivos.values())[indice_adesivo_atual]
+            historico_acao.append(imagem_com_efeitos.copy())
+            aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
+            atualizar_janela()
+        # Verifica se o clique está na barra de filtros
+        elif ALTURA_ADESIVOS + visualizacao_altura < y <= ALTURA_ADESIVOS + visualizacao_altura + ALTURA_BARRA:
+            indice_filtro = x // 90
+            if indice_filtro < len(nomes_filtros):
+                indice_filtro_atual = indice_filtro
+                imagem_com_efeitos = aplicar_filtro(imagem_original, indice_filtro_atual)
+                historico_acao.append(imagem_com_efeitos.copy())
+                atualizar_janela()
+
+    # Scroll do mouse para trocar adesivo
     elif evento == cv2.EVENT_MOUSEWHEEL:
-        indice_adesivo_atual = (indice_adesivo_atual + (1 if flags > 0 else -1)) % len(adesivos)
-        print(f"Adesivo atual: {list(adesivos.keys())[indice_adesivo_atual]}")
+        if flags > 0:
+            indice_adesivo_atual = (indice_adesivo_atual + 1) % len(adesivos)
+        else:
+            indice_adesivo_atual = (indice_adesivo_atual - 1) % len(adesivos)
+        atualizar_janela()
 
-# Função principal do programa
+
+# ---------------------------------------
+# Fluxo principal do programa
+# ---------------------------------------
+
 def main():
-    global imagem_com_efeitos, imagem_original, imagem_para_visualizacao, indice_filtro_atual, historico_acao
+    """
+    Executa o programa principal.
+    """
+    global imagem_com_efeitos, imagem_original, miniaturas, historico_acao
 
-    caminho_imagem = selecionar_imagem()
-    imagem_original = cv2.imread(caminho_imagem)
-    if imagem_original is None:
-        print("Erro ao carregar a imagem selecionada.")
+    # Seleciona uma imagem para edição
+    Tk().withdraw()
+    caminho_imagem = filedialog.askopenfilename(
+        title="Selecione uma imagem",
+        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.tiff *.gif")]
+    )
+    if not caminho_imagem:
+        print("Nenhuma imagem selecionada.")
         exit(1)
 
-    imagem_para_visualizacao = redimensionar_para_visualizacao(imagem_original)
+    # Carrega a imagem selecionada
+    imagem_original = cv2.imread(caminho_imagem)
+    if imagem_original is None:
+        print("Erro ao carregar a imagem.")
+        exit(1)
+
+    # Inicializa a imagem com efeitos e gera miniaturas
     imagem_com_efeitos = imagem_original.copy()
     historico_acao.append(imagem_com_efeitos.copy())
+    miniaturas = gerar_miniaturas(imagem_original)
 
-    imagem_com_menu = desenhar_menu_e_filtro(imagem_para_visualizacao.copy(), nomes_filtros[indice_filtro_atual])
-    cv2.imshow("Editor", imagem_com_menu)
+    # Exibe a interface e configura eventos de mouse
+    atualizar_janela()
     cv2.setMouseCallback("Editor", callback_mouse)
 
+    # Loop principal para interação do usuário
     while True:
         tecla = cv2.waitKey(1) & 0xFF
-        if tecla == 27:
+        if tecla == 27:  # Tecla ESC para sair
             break
-        elif tecla == ord('s'):
-            Tk().withdraw()
-            caminho_salvar = filedialog.asksaveasfilename(
-                title="Salvar imagem como",
-                defaultextension=".png",
-                filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
-            )
-            if caminho_salvar:
-                cv2.imwrite(caminho_salvar, imagem_com_efeitos)
-                print(f"Imagem salva em {caminho_salvar}")
-        elif tecla == ord('f'):
-            indice_filtro_atual = (indice_filtro_atual + 1) % len(nomes_filtros)
-            imagem_com_efeitos = aplicar_filtro(imagem_original, indice_filtro_atual)
-            imagem_para_visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
-            imagem_com_menu = desenhar_menu_e_filtro(imagem_para_visualizacao.copy(), nomes_filtros[indice_filtro_atual])
-            cv2.imshow("Editor", imagem_com_menu)
-        elif tecla == 26:
-            if len(historico_acao) > 1:
-                historico_acao.pop()
-                imagem_com_efeitos = historico_acao[-1].copy()
-                imagem_para_visualizacao = redimensionar_para_visualizacao(imagem_com_efeitos)
-                imagem_com_menu = desenhar_menu_e_filtro(imagem_para_visualizacao.copy(), nomes_filtros[indice_filtro_atual])
-                cv2.imshow("Editor", imagem_com_menu)
 
     cv2.destroyAllWindows()
 
+
+# ---------------------------------------
+# Executa o programa
+# ---------------------------------------
 if __name__ == "__main__":
     main()
