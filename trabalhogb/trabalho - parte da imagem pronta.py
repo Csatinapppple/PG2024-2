@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from tkinter import Tk, filedialog, Button, Toplevel
+from tkinter import Tk, filedialog
 
 # ---------------------------------------
 # Configurações iniciais e variáveis globais
@@ -27,19 +27,18 @@ indice_adesivo_atual = 0  # Indica o adesivo selecionado
 indice_filtro_atual = 0   # Indica o filtro selecionado
 historico_acao = []       # Histórico de ações para desfazer alterações
 imagem_original = None    # Imagem original carregada pelo usuário
-imagem_para_visualizacao = None  # Imagem redimensionada para visualização
 imagem_com_efeitos = None # Imagem com filtros e adesivos aplicados
 escala_visualizacao = None # Escala da imagem para ajustar ao quadro de edição
 miniaturas = []           # Miniaturas de filtros disponíveis para exibição
 
 # Dimensões do quadro de edição e elementos da interface
-LARGURA_JANELA = 1366      # Largura da janela principal
-ALTURA_JANELA = 768        # Altura da janela principal
-LARGURA_FRAME = 768        # Largura do frame de edição
-ALTURA_FRAME = 432         # Altura do frame de edição
-ALTURA_ADESIVOS = 100      # Altura da área de adesivos
-ALTURA_BARRA = 100         # Altura da barra de filtros
-ALTURA_BOTOES = 50         # Altura da área dos botões
+LARGURA_JANELA = 1366
+ALTURA_JANELA = 768
+LARGURA_FRAME = 768
+ALTURA_FRAME = 432
+ALTURA_ADESIVOS = 100
+ALTURA_BARRA = 100
+ALTURA_BOTOES = 50
 
 # Nomes dos filtros disponíveis
 nomes_filtros = [
@@ -151,8 +150,7 @@ def desfazer_acao():
     """
     global imagem_com_efeitos, historico_acao
     if len(historico_acao) > 1:
-        historico_acao.pop()
-        imagem_com_efeitos = historico_acao[-1].copy()
+        imagem_com_efeitos = historico_acao.pop(-1).copy()
         atualizar_janela()
 def gerar_miniaturas(imagem):
     """
@@ -161,7 +159,8 @@ def gerar_miniaturas(imagem):
     miniaturas = []
     for i in range(len(nomes_filtros)):
         filtro_aplicado = aplicar_filtro(imagem, i)
-        miniatura = cv2.resize(filtro_aplicado, (int(LARGURA_FRAME / len(nomes_filtros)), 80))  # Ajusta miniatura dinamicamente
+        largura_miniatura = LARGURA_JANELA // len(nomes_filtros)
+        miniatura = cv2.resize(filtro_aplicado, (largura_miniatura, 80))
         miniaturas.append(miniatura)
     return miniaturas
 
@@ -174,26 +173,15 @@ def atualizar_janela():
     largura_total = LARGURA_JANELA
     altura_total = ALTURA_JANELA
 
-    # Criação de uma janela com o tamanho total especificado
     janela = np.zeros((altura_total, largura_total, 3), dtype=np.uint8)
 
-    # Centraliza o frame de visualização
     x_offset_frame = (largura_total - visualizacao.shape[1]) // 2
     y_offset_frame = ALTURA_ADESIVOS
 
-    # Adiciona a área de adesivos na parte superior
     janela[:ALTURA_ADESIVOS] = desenhar_area_adesivos(largura_total)
-
-    # Adiciona a imagem no frame centralizado
     janela[y_offset_frame:y_offset_frame + visualizacao.shape[0], x_offset_frame:x_offset_frame + visualizacao.shape[1]] = visualizacao
-
-    # Adiciona a barra de filtros na parte inferior
     janela[y_offset_frame + visualizacao.shape[0]:y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA] = desenhar_barra_de_filtros(largura_total)
-
-    # Adiciona os botões abaixo da barra de filtros
     desenhar_botoes(janela, largura_total, y_offset_frame + visualizacao.shape[0] + ALTURA_BARRA)
-
-    # Exibe a janela atualizada
     cv2.imshow("Editor", janela)
 
 
@@ -217,7 +205,7 @@ def desenhar_barra_de_filtros(largura):
     Desenha a barra horizontal com miniaturas dos filtros.
     """
     barra = np.zeros((ALTURA_BARRA, largura, 3), dtype=np.uint8)
-    largura_miniatura = largura // len(nomes_filtros)  # Ajusta dinamicamente o tamanho das miniaturas
+    largura_miniatura = largura // len(nomes_filtros)
     x_offset = 0
     for i, miniatura in enumerate(miniaturas):
         miniatura_redimensionada = cv2.resize(miniatura, (largura_miniatura, 80))
@@ -234,17 +222,14 @@ def desenhar_botoes(janela, largura, y_offset):
     """
     botao_largura = 200
     botao_altura = ALTURA_BOTOES
-    espaco = 20  # Espaço entre os botões
+    espaco = 20
 
-    # Calcula a posição dos botões centralizados
     x_salvar = (largura // 2) - botao_largura - espaco
     x_desfazer = (largura // 2) + espaco
 
-    # Botão "Salvar"
     cv2.rectangle(janela, (x_salvar, y_offset), (x_salvar + botao_largura, y_offset + botao_altura), (200, 200, 200), -1)
     cv2.putText(janela, "Salvar", (x_salvar + 50, y_offset + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
-    # Botão "Desfazer"
     cv2.rectangle(janela, (x_desfazer, y_offset), (x_desfazer + botao_largura, y_offset + botao_altura), (200, 200, 200), -1)
     cv2.putText(janela, "Desfazer", (x_desfazer + 35, y_offset + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
@@ -259,23 +244,21 @@ def callback_mouse(evento, x, y, flags, parametros):
     y_offset_frame = ALTURA_ADESIVOS
 
     if evento == cv2.EVENT_LBUTTONDOWN:
-        # Verifica se o clique está na área dos adesivos
         if 0 <= y <= ALTURA_ADESIVOS:
             indice = x // 90
             if indice < len(adesivos):
                 indice_adesivo_atual = indice
                 atualizar_janela()
 
-        # Verifica se o clique está na imagem para adicionar adesivo
         elif y_offset_frame <= y <= y_offset_frame + visualizacao_altura:
             x_original = int((x - x_offset_frame) / escala_visualizacao)
             y_original = int((y - y_offset_frame) / escala_visualizacao)
             adesivo = list(adesivos.values())[indice_adesivo_atual]
             historico_acao.append(imagem_com_efeitos.copy())
             aplicar_adesivo(imagem_com_efeitos, adesivo, x_original, y_original)
+            historico_acao.append(imagem_com_efeitos.copy())  # Adiciona no histórico após a aplicação
             atualizar_janela()
 
-        # Verifica se o clique está na barra de filtros
         elif y_offset_frame + visualizacao_altura < y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA:
             indice_filtro = x // (LARGURA_JANELA // len(nomes_filtros))
             if indice_filtro < len(nomes_filtros):
@@ -284,7 +267,6 @@ def callback_mouse(evento, x, y, flags, parametros):
                 historico_acao.append(imagem_com_efeitos.copy())
                 atualizar_janela()
 
-        # Verifica se o clique está nos botões
         elif y_offset_frame + visualizacao_altura + ALTURA_BARRA <= y <= y_offset_frame + visualizacao_altura + ALTURA_BARRA + ALTURA_BOTOES:
             largura_botoes = 200
             espaco_botoes = 20
@@ -307,7 +289,6 @@ def main():
     """
     global imagem_com_efeitos, imagem_original, miniaturas, historico_acao
 
-    # Seleciona uma imagem para edição
     Tk().withdraw()
     caminho_imagem = filedialog.askopenfilename(
         title="Selecione uma imagem",
@@ -317,25 +298,21 @@ def main():
         print("Nenhuma imagem selecionada.")
         exit(1)
 
-    # Carrega a imagem selecionada
     imagem_original = cv2.imread(caminho_imagem)
     if imagem_original is None:
         print("Erro ao carregar a imagem.")
         exit(1)
 
-    # Inicializa a imagem com efeitos e gera miniaturas
     imagem_com_efeitos = imagem_original.copy()
     historico_acao.append(imagem_com_efeitos.copy())
     miniaturas = gerar_miniaturas(imagem_original)
 
-    # Exibe a interface e configura eventos de mouse
     atualizar_janela()
     cv2.setMouseCallback("Editor", callback_mouse)
 
-    # Loop principal para interação do usuário
     while True:
         tecla = cv2.waitKey(1) & 0xFF
-        if tecla == 27:  # Tecla ESC para sair
+        if tecla == 27:
             break
 
     cv2.destroyAllWindows()
